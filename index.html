@@ -1609,7 +1609,7 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
                   <button class="ab sp" onclick="metaShowTokenGuide()" style="font-size:.72rem;">
                     <i class="ti ti-help-circle"></i> Cómo obtener el token
                   </button>
-                  <button class="ab" onclick="metaLoadInsights()" style="font-size:.72rem;">
+                  <button class="ab" onclick="metaInit()" style="font-size:.72rem;">
                     <i class="ti ti-refresh"></i> Actualizar datos
                   </button>
                 </div>
@@ -3238,338 +3238,286 @@ var META_CONFIG = {
 // [removed: function applyMetaAppId()]
 
 
-function metaActivateDemo(statId) {
-  META_CONFIG.connected = true;
-  META_CONFIG.accessToken = 'DEMO';
-  if (statId) {
-    var el = document.getElementById(statId);
-    if (el) { el.textContent = '● Conectado · modo demo (configura App ID)'; el.style.color = 'var(--amber)'; }
-  }
-  toast('Meta conectado en modo demo · configura tu App ID para datos reales');
-  metaLoadInsights();
-  metaUpdateDashboardBadge(true);
-}
 
-// ── LOAD AD ACCOUNT ───────────────────────────────────
-function metaLoadAdAccount() {
-  if (!META_CONFIG.accessToken || META_CONFIG.accessToken === 'DEMO') return;
-  fetch('https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name&access_token=' + META_CONFIG.accessToken)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.data && data.data[0]) {
-        META_CONFIG.adAccountId = data.data[0].id;
-        metaLoadInsights();
-      }
-    })
-    .catch(function(e) { console.warn('Meta adaccounts error:', e); });
-}
+// ═══════════════════════════════════════════════════════════════════
+// META ADS API — Flujo robusto completo
+// Token: pre-configurado · Cuenta: Ingenal SA
+// ═══════════════════════════════════════════════════════════════════
 
-// ── LOAD CAMPAIGN INSIGHTS ────────────────────────────
-function metaLoadInsights() {
-  // If real token & account, fetch from API
-  if (META_CONFIG.accessToken && META_CONFIG.accessToken !== 'DEMO' && META_CONFIG.adAccountId) {
-    var url = 'https://graph.facebook.com/v19.0/' + META_CONFIG.adAccountId
-      + '/campaigns?fields=name,status,insights{reach,impressions,clicks,spend,cpc,ctr,actions}&date_preset=last_7d'
-      + '&access_token=' + META_CONFIG.accessToken;
-    fetch(url)
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.data) metaRenderCampaigns(data.data, false);
-      })
-      .catch(function(e) { console.warn('Insights error:', e); metaRenderCampaigns(null, true); });
-  } else {
-    // Use real data from CSV import + demo format
-    metaRenderCampaigns(null, true);
-  }
-}
+var META_CONFIG = {
+  accessToken: '',
+  adAccountId: '',
+  accountName: '',
+  userName:    '',
+  connected:   false,
+};
 
-// ── RENDER CAMPAIGNS IN DASHBOARD ────────────────────
-var META_DEMO_CAMPAIGNS = [];
-
-function metaRenderCampaigns(apiData, useDemo) {
-  // If useDemo or no real data — show empty state, never show fake data
-  if (useDemo || !apiData || !apiData.length) {
-    metaShowEmptyState();
-    return;
-  }
-  // Map real API data
-  var campaigns = apiData.map(function(c) {
-    var ins = (c.insights && c.insights.data && c.insights.data[0]) || {};
-    return {
-      name:        c.name,
-      status:      c.status,
-      reach:       parseInt(ins.reach || 0),
-      impressions: parseInt(ins.impressions || 0),
-      clicks:      parseInt(ins.clicks || 0),
-      spend:       Math.round(parseFloat(ins.spend || 0) * 4400),
-      cpc:         Math.round(parseFloat(ins.cpc || 0) * 4400),
-      leads:       (ins.actions || []).filter(function(a){ return a.action_type === 'lead'; })
-                     .reduce(function(s,a){ return s + parseInt(a.value); }, 0),
-    };
-  });
-  metaUpdateDashboardTable(campaigns);
-  metaUpdateKpiStrip(campaigns);
-  // Update connect status
-  var statusEl = document.getElementById('meta-connect-status');
-  if (statusEl) { statusEl.textContent = '● En tiempo real · ' + campaigns.length + ' campañas'; statusEl.style.color = 'var(--green)'; }
-  ['fb-stat','meta-stat'].forEach(function(id){
-    var el = document.getElementById(id);
-    if (el && el.textContent.indexOf('Conectado') < 0) {
-      el.textContent = '● Conectado · Meta Ads activo';
-      el.style.color = 'var(--green)';
-    }
-  });
-}
-
-function metaShowEmptyState() {
-  var empty = document.getElementById('dash-campaigns-empty');
-  var table = document.getElementById('dash-campaigns-table');
-  if (empty) empty.style.display = 'block';
-  if (table) table.style.display = 'none';
-  // Clear KPIs
-  ['kpi-reach','kpi-impr','kpi-cpr','kpi-spend'].forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.textContent = '—';
-  });
-}
-
-function fmt(n) {
-  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
-  if (n >= 1000)    return (n/1000).toFixed(1) + 'K';
-  return n;
-}
-function fmtCOP(n) { return '$' + Math.round(n/1000) + 'K'; }
-
-function metaUpdateDashboardTable(campaigns) {
-  var empty = document.getElementById('dash-campaigns-empty');
-  var tableWrap = document.getElementById('dash-campaigns-table');
-  if (!tableWrap) return;
-  if (empty) empty.style.display = 'none';
-  tableWrap.style.display = 'block';
-  // Remove old rows except header
-  tableWrap.querySelectorAll('.camp-row:not(.hdr)').forEach(function(r){ r.remove(); });
-  var maxReach = campaigns.length ? Math.max.apply(null, campaigns.map(function(c){ return c.reach || 0; })) : 1;
-  campaigns.slice(0,5).forEach(function(c) {
-    var pct = maxReach > 0 ? Math.round((c.reach || 0) / maxReach * 100) : 0;
-    var statusColor = c.status === 'ACTIVE' ? '#059669' : '#D97706';
-    var dot = '<span style="width:7px;height:7px;border-radius:50%;background:' + statusColor + ';display:inline-block;margin-right:4px;"></span>';
-    var row = document.createElement('div');
-    row.className = 'camp-row';
-    row.innerHTML = '<div>'
-      + '<div class="camp-name">' + dot + c.name.substring(0,26) + (c.name.length > 26 ? '…' : '') + '</div>'
-      + '<div class="camp-bar"><div class="camp-bar-fill" style="width:' + pct + '%"></div></div>'
-      + '</div>'
-      + '<span>' + fmt(c.reach) + '</span>'
-      + '<span>' + fmt(c.clicks) + '</span>'
-      + '<span>' + (c.leads || '—') + '</span>'
-      + '<span>' + fmtCOP(c.spend) + '</span>'
-      + '<span><span class="pill p-d">' + fmtCOP(c.cpc) + '</span></span>';
-    tableWrap.appendChild(row);
-  });
-}
-
-function metaUpdateKpiStrip(campaigns) {
-  var totalReach  = campaigns.reduce(function(s,c){ return s+(c.reach||0); }, 0);
-  var totalSpend  = campaigns.reduce(function(s,c){ return s+(c.spend||0); }, 0);
-  var totalLeads  = campaigns.reduce(function(s,c){ return s+(c.leads||0); }, 0);
-  var totalClicks = campaigns.reduce(function(s,c){ return s+(c.clicks||0); }, 0);
-  var totalImpr   = campaigns.reduce(function(s,c){ return s+(c.impressions||0); }, 0);
-  var avgCpr      = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
-  var ids = { 'kpi-reach': fmt(totalReach), 'kpi-impr': fmt(totalImpr), 'kpi-cpr': avgCpr > 0 ? fmtCOP(avgCpr) : '—', 'kpi-spend': fmtCOP(totalSpend) };
-  Object.keys(ids).forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.textContent = ids[id];
-  });
-  // Update dashboard stat for campaigns
-  var campEl = document.getElementById('dash-camps');
-  if (campEl) campEl.textContent = campaigns.filter(function(c){ return c.status === 'ACTIVE'; }).length;
-}
-
-// metaUpdateSocialStatus removed — handled in metaRenderCampaigns
-
-
-function metaUpdateDashboardBadge(active) {
-  var badge = document.createElement('div');
-  badge.style.cssText = 'position:absolute;top:-5px;right:-5px;width:10px;height:10px;border-radius:50%;background:' + (active ? '#059669' : '#DC2626') + ';border:2px solid #fff;';
-  var metaBtn = document.querySelector('.soc-item .soc-ic[style*="1877F2"]');
-  if (metaBtn && !metaBtn.querySelector('div[style*="border-radius:50%"]')) metaBtn.style.position = 'relative';
-}
-
-// ── OVERRIDE socConnect for Facebook to use real FB Login ─
-var _origSocConnect = null;
-function socConnect(platform, statId) {
-  if (platform === 'facebook' || platform === 'meta') {
-    // Use token-based connection instead of OAuth
-    var el = document.getElementById('metaTokenInput');
-    if (el) { sNav('redes', document.querySelector('.sni')); toast('Ingresa tu token de Meta en Redes Sociales'); }
-    return;
-  }
-  // For other platforms use original simulation
-  if (_origSocConnect) { _origSocConnect(platform, statId); return; }
-  // Fallback simulation
-  var names = { instagram:'Instagram', tiktok:'TikTok', google:'Google/YouTube' };
-  var nm = names[platform] || platform;
-  var popup = window.open('about:blank','oauth_'+platform,'width=500,height=600');
-  if (popup) {
-    popup.document.write('<html><body style="font-family:sans-serif;padding:40px;text-align:center;background:#f0eeff;"><h2>Conectar con '+nm+'</h2><button onclick="window.close()" style="padding:12px 24px;background:#6366F1;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:1rem;margin-top:20px;">Autorizar</button></body></html>');
-    setTimeout(function() {
-      if (popup && !popup.closed) popup.close();
-      if (statId) { var el = document.getElementById(statId); if (el) { el.textContent = '● Conectado · @archibot_' + platform; el.style.color = 'var(--green)'; } }
-      toast('✓ ' + nm + ' conectado');
-    }, 1500);
-  }
-}
-
-// Auto-refresh campaign data every 5 minutes when connected
-setInterval(function() {
-  if (META_CONFIG.connected) metaLoadInsights();
-}, 300000);
-
-// Try to restore Meta connection from storage
-try {
-  var savedToken = localStorage.getItem('ab_meta_token');
-  if (savedToken) {
-    META_CONFIG.accessToken = savedToken;
-    META_CONFIG.connected   = true;
-    setTimeout(metaLoadInsights, 1500);
-  }
-} catch(e) {}
-
-
-// ══════════════════════════════════════════════════════════
-// META GRAPH API — Token-based connection (no OAuth needed)
-// Works from any URL, no app domain restrictions
-// ══════════════════════════════════════════════════════════
-
-function metaConnectWithToken() {
-  var tokenEl = document.getElementById('metaTokenInput');
-  var token = tokenEl ? tokenEl.value.trim() : '';
-
-  // If field is empty, try using the pre-configured token
+// ── ENTRY POINT: conectar o actualizar ───────────────────────────
+// Llama esto siempre — maneja token vacío, restauración y refresh
+function metaInit() {
+  var token = '';
+  try { token = localStorage.getItem('ab_meta_token') || ''; } catch(e) {}
   if (!token || token.length < 20) {
-    var saved = '';
-    try { saved = localStorage.getItem('ab_meta_token') || ''; } catch(e) {}
-    if (saved && saved.length > 20) {
-      token = saved;
-    } else {
-      toast('⚠ Ingresa tu token de acceso de Meta en el campo de texto');
-      if (tokenEl) {
-        tokenEl.style.borderColor = '#DC2626';
-        tokenEl.focus();
-        setTimeout(function(){ tokenEl.style.borderColor='rgba(160,150,240,.5)'; }, 3000);
-      }
-      return;
-    }
+    metaSetStatus('sin-token');
+    return;
   }
-
-  // Save token securely
-  try { localStorage.setItem('ab_meta_token', token); } catch(e) {}
   META_CONFIG.accessToken = token;
   META_CONFIG.connected   = true;
+  // Try to restore cached account ID (avoid extra API call)
+  try {
+    var cached = JSON.parse(localStorage.getItem('ab_meta_account') || '{}');
+    if (cached.id) {
+      META_CONFIG.adAccountId = cached.id;
+      META_CONFIG.accountName = cached.name || '';
+    }
+  } catch(e) {}
+  // Always verify token + load fresh data
+  metaVerifyAndLoad(token);
+}
 
-  // Clear input for security after saving
-  if (tokenEl) tokenEl.value = '';
-
-  // Update ALL status elements immediately
-  var statEl = document.getElementById('fb-stat');
-  if (statEl) { statEl.textContent = '⏳ Verificando token con Meta…'; statEl.style.color = 'var(--amber)'; }
-  var metaStatEl = document.getElementById('meta-stat');
-  if (metaStatEl) { metaStatEl.textContent = '⏳ Conectando…'; metaStatEl.style.color = 'var(--amber)'; }
-
-  // Show loading toast with spinner
-  toast('⏳ Conectando con Meta Ads — verificando token…');
-
-  // Verify token by calling /me
+// ── VERIFY TOKEN → LOAD ACCOUNTS → LOAD CAMPAIGNS ───────────────
+function metaVerifyAndLoad(token) {
+  metaSetStatus('cargando');
+  // Step 1: verify token /me
   fetch('https://graph.facebook.com/v19.0/me?fields=id,name&access_token=' + token)
     .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.error) {
-        metaHandleTokenError(data.error, statEl);
+    .then(function(me) {
+      if (me.error) {
+        console.warn('Meta token error:', me.error.message);
+        metaSetStatus('token-invalido', me.error.message);
+        try { localStorage.removeItem('ab_meta_token'); } catch(e) {}
         return;
       }
-      // Token valid
-      META_CONFIG.userName = data.name || 'Usuario Meta';
-      var successMsg = '● Conectado · ' + META_CONFIG.userName;
-      // Update all status elements
-      ['fb-stat','meta-stat'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) { el.textContent = successMsg; el.style.color = 'var(--green)'; }
-      });
-      // Show success badge in dashboard
-      metaUpdateDashboardBadge(true);
-      toast('✓ Meta Ads conectado como ' + META_CONFIG.userName + ' · cargando campañas…');
-      // Load ad accounts and campaigns
-      metaLoadAdAccountWithToken(token);
+      META_CONFIG.userName = me.name || 'Usuario';
+      // Step 2: load ad accounts
+      return fetch('https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_status&limit=10&access_token=' + token)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            // Token valid but no ads permission — still show connected
+            metaSetStatus('conectado-sin-ads', META_CONFIG.userName);
+            metaShowNoAdsState();
+            return;
+          }
+          var accounts = (data.data || []).filter(function(a) { return a.account_status === 1; });
+          if (!accounts.length) accounts = data.data || [];
+          if (!accounts.length) {
+            metaSetStatus('conectado-sin-ads', META_CONFIG.userName);
+            metaShowNoAdsState();
+            return;
+          }
+          var acct = accounts[0];
+          META_CONFIG.adAccountId = acct.id;
+          META_CONFIG.accountName = acct.name;
+          try { localStorage.setItem('ab_meta_account', JSON.stringify({id: acct.id, name: acct.name})); } catch(e) {}
+          metaSetStatus('conectado', META_CONFIG.userName + ' · ' + acct.name);
+          // Step 3: load campaigns
+          metaFetchCampaigns(token, acct.id);
+        });
     })
     .catch(function(err) {
-      console.log('Meta API network error:', err);
-      // Likely CORS from local file - token probably valid, load demo data
-      var errMsg = '● Token guardado · cargando datos de campaña…';
-      ['fb-stat','meta-stat'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) { el.textContent = errMsg; el.style.color = 'var(--amber)'; }
-      });
-      toast('Token guardado · cargando datos de tus campañas');
-      // Load demo based on real Salvador campaign data
-      metaRenderCampaigns(null, true);
+      console.warn('Meta network error:', err);
+      // Network error — token probably valid, show last cached data
+      metaSetStatus('red-error');
+      // Try with cached account if available
+      if (META_CONFIG.adAccountId) {
+        metaFetchCampaigns(token, META_CONFIG.adAccountId);
+      }
     });
 }
 
-function metaHandleTokenError(err, statEl) {
-  var msg = err.message || 'Token inválido';
-  if (statEl) { statEl.textContent = '✗ Error: ' + msg; statEl.style.color = '#DC2626'; }
-  try { localStorage.removeItem('ab_meta_token'); } catch(e) {}
-  META_CONFIG.connected = false;
-  toast('Token inválido · ' + msg);
-}
-
-function metaLoadAdAccountWithToken(token) {
-  fetch('https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_status&access_token=' + token)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.error) { metaRenderCampaigns(null, true); return; }
-      if (data.data && data.data.length > 0) {
-        // Use first active account
-        var account = data.data.find(function(a){ return a.account_status === 1; }) || data.data[0];
-        META_CONFIG.adAccountId = account.id;
-        META_CONFIG.accountName = account.name || account.id;
-        var statEl = document.getElementById('fb-stat');
-        if (statEl) { statEl.textContent = '● Conectado · ' + (META_CONFIG.userName||'Meta') + ' · ' + account.name; statEl.style.color = 'var(--green)'; }
-        metaLoadCampaignsWithToken(token, account.id);
-      } else {
-        // User has no ad accounts — show personal data and demo campaigns
-        var statEl = document.getElementById('fb-stat');
-        if (statEl) { statEl.textContent = '● Conectado · ' + (META_CONFIG.userName||'Meta') + ' · sin cuentas publicitarias'; statEl.style.color = 'var(--amber)'; }
-        toast('Token válido · sin cuentas publicitarias asociadas · cargando demo');
-        metaRenderCampaigns(null, true);
-      }
-    })
-    .catch(function() { metaRenderCampaigns(null, true); });
-}
-
-function metaLoadCampaignsWithToken(token, accountId) {
-  var since = Math.floor((Date.now() - 7*24*60*60*1000) / 1000);
-  var until = Math.floor(Date.now() / 1000);
-  var sinceDate = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
-  var untilDate = new Date().toISOString().split('T')[0];
-  var fields = 'name,status,insights{reach,impressions,clicks,spend,cpc,actions}';
-  var url = 'https://graph.facebook.com/v19.0/' + accountId + '/campaigns?fields=' + encodeURIComponent(fields) + '&date_preset=last_7d&access_token=' + token + '&limit=10';
+// ── FETCH CAMPAIGNS ──────────────────────────────────────────────
+function metaFetchCampaigns(token, accountId) {
+  var fields = 'name,status,objective,insights.date_preset(last_7d){reach,impressions,clicks,spend,cpc,ctr,actions}';
+  var url = 'https://graph.facebook.com/v19.0/' + accountId
+    + '/campaigns?fields=' + encodeURIComponent(fields)
+    + '&limit=20&access_token=' + token;
 
   fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data.error || !data.data) {
-        metaRenderCampaigns(null, true);
-        toast('Campañas: usando datos demo (ajusta permisos del token)');
+      if (data.error) {
+        console.warn('Campaigns error:', data.error.message);
+        metaShowNoAdsState();
         return;
       }
-      metaRenderCampaigns(data.data, false);
-      toast('✓ ' + data.data.length + ' campañas cargadas desde Meta Ads');
+      var campaigns = (data.data || []).map(function(c) {
+        var ins = (c.insights && c.insights.data && c.insights.data[0]) || {};
+        var leads = ((ins.actions || []).find(function(a) {
+          return a.action_type === 'lead' || a.action_type === 'onsite_conversion.lead_grouped';
+        }) || {}).value || 0;
+        return {
+          id:          c.id,
+          name:        c.name,
+          status:      c.status,
+          objective:   c.objective || '',
+          reach:       parseInt(ins.reach || 0),
+          impressions: parseInt(ins.impressions || 0),
+          clicks:      parseInt(ins.clicks || 0),
+          spend:       parseFloat(ins.spend || 0),
+          spendCOP:    Math.round(parseFloat(ins.spend || 0) * 4200),
+          cpc:         parseFloat(ins.cpc || 0),
+          ctr:         parseFloat(ins.ctr || 0),
+          leads:       parseInt(leads),
+        };
+      });
+      // Cache for offline use
+      try { localStorage.setItem('ab_meta_campaigns', JSON.stringify(campaigns)); } catch(e) {}
+      metaRenderDashboard(campaigns);
+      metaUpdateConnectStatus(campaigns.length);
+      toast('✓ Meta Ads · ' + campaigns.length + ' campañas cargadas en tiempo real');
     })
-    .catch(function() { metaRenderCampaigns(null, true); });
+    .catch(function(err) {
+      console.warn('Campaigns fetch error:', err);
+      // Try cached campaigns
+      try {
+        var cached = JSON.parse(localStorage.getItem('ab_meta_campaigns') || '[]');
+        if (cached.length) {
+          metaRenderDashboard(cached);
+          toast('Datos de campañas desde caché · sin conexión a Meta');
+        } else {
+          metaShowNoAdsState();
+        }
+      } catch(e) { metaShowNoAdsState(); }
+    });
 }
 
-// ── TOKEN GUIDE MODAL ─────────────────────────────────
+// ── RENDER DASHBOARD ─────────────────────────────────────────────
+function metaRenderDashboard(campaigns) {
+  // Hide empty state, show table
+  var empty = document.getElementById('dash-campaigns-empty');
+  var tableWrap = document.getElementById('dash-campaigns-table');
+  if (empty) empty.style.display = 'none';
+  if (tableWrap) tableWrap.style.display = 'block';
+  if (!tableWrap) return;
+
+  // Clear old rows (keep header)
+  tableWrap.querySelectorAll('.camp-row:not(.hdr)').forEach(function(r){ r.remove(); });
+
+  // Sort by spend descending
+  var sorted = campaigns.slice().sort(function(a,b){ return b.spendCOP - a.spendCOP; });
+  var maxReach = sorted.length ? Math.max.apply(null, sorted.map(function(c){ return c.reach || 0; })) : 1;
+
+  sorted.slice(0, 5).forEach(function(c) {
+    var pct     = maxReach > 0 ? Math.round((c.reach || 0) / maxReach * 100) : 0;
+    var isActive = c.status === 'ACTIVE';
+    var dotColor = isActive ? '#059669' : '#D97706';
+    var dot = '<span style="width:7px;height:7px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:5px;flex-shrink:0;"></span>';
+    var row = document.createElement('div');
+    row.className = 'camp-row';
+    row.style.cursor = 'pointer';
+    row.title = c.name;
+    row.innerHTML = '<div style="min-width:0;">'
+      + '<div class="camp-name" style="display:flex;align-items:center;">' + dot + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + c.name.substring(0, 30) + (c.name.length > 30 ? '…' : '') + '</span></div>'
+      + '<div class="camp-bar"><div class="camp-bar-fill" style="width:' + pct + '%"></div></div>'
+      + '</div>'
+      + '<span>' + fmtNum(c.reach) + '</span>'
+      + '<span>' + fmtNum(c.clicks) + '</span>'
+      + '<span>' + (c.leads > 0 ? c.leads : '—') + '</span>'
+      + '<span>' + fmtCOP(c.spendCOP) + '</span>'
+      + '<span>' + (c.spendCOP > 0 && c.leads > 0 ? '<span class="pill p-d">' + fmtCOP(Math.round(c.spendCOP / c.leads)) + '</span>' : '—') + '</span>';
+    tableWrap.appendChild(row);
+  });
+
+  // Update KPIs
+  var totalReach  = campaigns.reduce(function(s,c){ return s+(c.reach||0); }, 0);
+  var totalImpr   = campaigns.reduce(function(s,c){ return s+(c.impressions||0); }, 0);
+  var totalSpend  = campaigns.reduce(function(s,c){ return s+(c.spendCOP||0); }, 0);
+  var totalLeads  = campaigns.reduce(function(s,c){ return s+(c.leads||0); }, 0);
+  var totalClicks = campaigns.reduce(function(s,c){ return s+(c.clicks||0); }, 0);
+  var avgCpr      = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
+  var activeCamps = campaigns.filter(function(c){ return c.status === 'ACTIVE'; }).length;
+
+  setEl('kpi-reach', fmtNum(totalReach));
+  setEl('kpi-impr',  fmtNum(totalImpr));
+  setEl('kpi-cpr',   avgCpr > 0 ? fmtCOP(avgCpr) : '—');
+  setEl('kpi-spend', fmtCOP(totalSpend));
+  setEl('dash-camps', activeCamps > 0 ? activeCamps : '—');
+
+  // Connect status on dashboard
+  var sc = document.getElementById('meta-connect-status');
+  if (sc) { sc.textContent = '● ' + activeCamps + ' activas · tiempo real'; sc.style.color = '#059669'; }
+}
+
+function metaShowNoAdsState() {
+  var empty = document.getElementById('dash-campaigns-empty');
+  var tableWrap = document.getElementById('dash-campaigns-table');
+  if (empty) { empty.style.display = 'block'; empty.innerHTML = '<div style="text-align:center;padding:28px 0;color:var(--ink3);"><i class="ti ti-ad-off" style="font-size:2rem;display:block;margin-bottom:8px;opacity:.4;"></i><div style="font-size:.83rem;">Token conectado · sin campañas activas en los últimos 7 días</div><button class="ab sp" style="margin-top:10px;" onclick="metaInit()">Reintentar</button></div>'; }
+  if (tableWrap) tableWrap.style.display = 'none';
+}
+
+// ── STATUS HELPERS ────────────────────────────────────────────────
+function metaSetStatus(state, extra) {
+  var msgs = {
+    'cargando':          '⏳ Cargando campañas…',
+    'conectado':         '● Conectado · ' + (extra || META_CONFIG.userName),
+    'conectado-sin-ads': '● Conectado · ' + (extra || '') + ' · sin cuentas de anuncios',
+    'token-invalido':    '✗ Token expirado · genera uno nuevo',
+    'red-error':         '⚠ Sin conexión · usando caché',
+    'sin-token':         'No conectado · ingresa tu token',
+  };
+  var colors = {
+    'cargando':'var(--amber)', 'conectado':'var(--green)',
+    'conectado-sin-ads':'var(--amber)', 'token-invalido':'#DC2626',
+    'red-error':'var(--amber)', 'sin-token':'var(--ink3)',
+  };
+  var msg   = msgs[state]   || state;
+  var color = colors[state] || 'var(--ink2)';
+  ['fb-stat','meta-stat'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.style.color = color; }
+  });
+}
+
+function metaUpdateConnectStatus(count) {
+  metaSetStatus('conectado', META_CONFIG.userName + ' · ' + META_CONFIG.accountName);
+  var sc = document.getElementById('meta-connect-status');
+  if (sc) { sc.textContent = '● Tiempo real · ' + count + ' campañas'; sc.style.color = '#059669'; }
+}
+
+// ── OVERRIDE: metaConnectWithToken (called by Conectar button) ───
+function metaConnectWithToken() {
+  var tokenEl = document.getElementById('metaTokenInput');
+  var token   = tokenEl ? tokenEl.value.trim() : '';
+  if (!token || token.length < 20) {
+    // Try saved token
+    try { token = localStorage.getItem('ab_meta_token') || ''; } catch(e) {}
+    if (!token || token.length < 20) {
+      toast('⚠ Ingresa tu token de acceso de Meta en el campo de texto');
+      if (tokenEl) { tokenEl.style.borderColor = '#DC2626'; tokenEl.focus(); setTimeout(function(){ tokenEl.style.borderColor = ''; }, 3000); }
+      return;
+    }
+  }
+  try { localStorage.setItem('ab_meta_token', token); } catch(e) {}
+  META_CONFIG.accessToken = token;
+  META_CONFIG.connected   = true;
+  if (tokenEl) tokenEl.value = '';
+  metaVerifyAndLoad(token);
+}
+
+// ── OVERRIDE: metaLoadInsights (called by Actualizar button) ─────
+function metaLoadInsights() {
+  metaInit(); // Always re-run full init
+}
+
+// ── FORMAT HELPERS ────────────────────────────────────────────────
+function fmtNum(n) {
+  n = parseInt(n) || 0;
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return (n/1000).toFixed(1) + 'K';
+  return n.toString();
+}
+function fmtCOP(n) {
+  n = parseInt(n) || 0;
+  if (n >= 1000000) return '$' + (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return '$' + Math.round(n/1000) + 'K';
+  return '$' + n;
+}
+function fmt(n)    { return fmtNum(n); }
+function fmtCOP_old(n) { return fmtCOP(n); }
+function setEl(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; }
+
+// ── TOKEN GUIDE ───────────────────────────────────────────────────
 function metaShowTokenGuide() {
   var w = document.getElementById('metaGuideModal');
   if (w) { w.style.display = 'flex'; return; }
@@ -3582,23 +3530,18 @@ function metaShowTokenGuide() {
     + '<button onclick="document.getElementById(\'metaGuideModal\').style.display=\'none\'" style="background:rgba(0,0,0,.06);border:none;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:1rem;">×</button>'
     + '</div>'
     + '<div style="display:flex;flex-direction:column;gap:10px;">'
-    + '<div style="background:#EEF2FF;border-radius:12px;padding:13px;font-size:.84rem;line-height:1.65;">'
-    + '<strong style="color:#1877F2;">Opción A — Token de página (recomendado para campañas):</strong><br>'
+    + '<div style="background:#EEF2FF;border-radius:12px;padding:13px;font-size:.84rem;line-height:1.7;">'
+    + '<strong style="color:#1877F2;">Token de usuario (60 días):</strong><br>'
     + '1. Ve a <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:#6366F1;font-weight:700;">Graph API Explorer</a><br>'
-    + '2. En <strong>Meta App</strong> selecciona tu app de ArchiBot<br>'
-    + '3. En <strong>User or Page</strong> → selecciona <strong>Get User Access Token</strong><br>'
-    + '4. Activa los permisos: <code style="background:#fff;padding:1px 5px;border-radius:4px;">ads_read</code>, <code style="background:#fff;padding:1px 5px;border-radius:4px;">read_insights</code>, <code style="background:#fff;padding:1px 5px;border-radius:4px;">ads_management</code><br>'
-    + '5. Clic en <strong>Generate Access Token</strong> → copia el token generado'
+    + '2. Selecciona tu app → <strong>Get User Access Token</strong><br>'
+    + '3. Activa: <code style="background:#fff;padding:1px 5px;border-radius:4px;">ads_read</code>, <code style="background:#fff;padding:1px 5px;border-radius:4px;">read_insights</code>, <code style="background:#fff;padding:1px 5px;border-radius:4px;">ads_management</code><br>'
+    + '4. Clic <strong>Generate Access Token</strong> → copia el token'
     + '</div>'
-    + '<div style="background:#E8F5E9;border-radius:12px;padding:13px;font-size:.84rem;line-height:1.65;">'
-    + '<strong style="color:#059669;">Opción B — Token de sistema (para producción):</strong><br>'
-    + '1. Ve a <a href="https://business.facebook.com/settings/system-users" target="_blank" style="color:#6366F1;font-weight:700;">Meta Business Settings → System Users</a><br>'
-    + '2. Crea un usuario de sistema → asígnale la cuenta publicitaria<br>'
-    + '3. Genera un token con permisos de <strong>Ads Read</strong><br>'
-    + '4. Este token no expira — ideal para producción'
-    + '</div>'
-    + '<div style="background:#FFF3E0;border-radius:12px;padding:13px;font-size:.82rem;line-height:1.6;">'
-    + '<strong>⚠ Importante:</strong> El token de usuario expira en 60 días. Para evitar re-conexiones, usa el token de sistema (Opción B). Tu token se guarda encriptado en el navegador.'
+    + '<div style="background:#E8F5E9;border-radius:12px;padding:13px;font-size:.84rem;line-height:1.7;">'
+    + '<strong style="color:#059669;">Token de sistema (no expira — recomendado):</strong><br>'
+    + '1. Ve a <a href="https://business.facebook.com/settings/system-users" target="_blank" style="color:#6366F1;font-weight:700;">Meta Business → Usuarios del sistema</a><br>'
+    + '2. Crea usuario → asigna cuenta publicitaria → genera token<br>'
+    + '3. Permisos: <code style="background:#fff;padding:1px 5px;border-radius:4px;">ads_read</code> + <code style="background:#fff;padding:1px 5px;border-radius:4px;">ads_management</code>'
     + '</div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;margin-top:16px;">'
@@ -3607,6 +3550,22 @@ function metaShowTokenGuide() {
     + '</div></div>';
   document.body.appendChild(w);
 }
+
+// ── AUTO-INIT on load ─────────────────────────────────────────────
+// Runs 3s after page load to give Firebase time to initialize first
+setTimeout(function() {
+  metaInit();
+}, 3000);
+
+// Refresh every 5 minutes when tab is active
+setInterval(function() {
+  if (META_CONFIG.connected && document.visibilityState === 'visible') {
+    metaFetchCampaigns(META_CONFIG.accessToken, META_CONFIG.adAccountId);
+  }
+}, 300000);
+
+
+
 
 // Restore saved token on load — pre-configured for archibot-janeiro
 (function() {
