@@ -1586,35 +1586,43 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
             </div>
           </div>
           <div class="soc-item">
-            <div class="soc-ic" style="background:#1877F2;"><i class="ti ti-brand-facebook"></i></div>
+            <div class="soc-ic" style="background:#1877F2;position:relative;">
+              <i class="ti ti-brand-facebook"></i>
+              <span id="meta-status-dot" style="position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;background:#DC2626;border:2px solid #fff;"></span>
+            </div>
             <div style="flex:1;">
               <div class="soc-n">Facebook / Meta Ads</div>
               <div class="soc-s" id="fb-stat">No conectado</div>
-              <div style="margin-top:8px;">
-                <div style="font-size:.77rem;color:var(--ink2);margin-bottom:7px;line-height:1.5;">
-                  Conecta con tu <strong>Token de acceso</strong> de Meta Business. 
-                  <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--a);">Obtener token →</a>
-                </div>
-                <div style="display:flex;gap:6px;align-items:center;">
-                  <input id="metaTokenInput" type="password" placeholder="Token de acceso Meta (EAABs...)"
-                    style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid rgba(160,150,240,.5);background:rgba(255,255,255,.9);font-size:.8rem;font-family:'DM Sans',sans-serif;outline:none;"
-                    onfocus="this.style.borderColor='var(--a)'" onblur="this.style.borderColor='rgba(160,150,240,.5)'">
-                  <button class="soc-login-btn" style="background:#1877F2;color:#fff;white-space:nowrap;padding:8px 14px;"
+              <div id="meta-debug" style="font-size:.7rem;color:#DC2626;margin-top:2px;font-weight:600;"></div>
+              <div style="margin-top:10px;">
+                <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+                  <input id="metaTokenInput" type="password"
+                    placeholder="Pega aquí tu token Meta (EAABs... o EAAT...)"
+                    style="flex:1;padding:9px 12px;border-radius:10px;border:1.5px solid rgba(160,150,240,.5);background:rgba(255,255,255,.9);font-size:.82rem;font-family:'DM Sans',sans-serif;outline:none;"
+                    onfocus="this.style.borderColor='#6366F1'" onblur="this.style.borderColor='rgba(160,150,240,.5)'"
+                    onkeydown="if(event.key==='Enter')metaConnectWithToken()">
+                  <button style="background:linear-gradient(135deg,#1877F2,#0d5db5);color:#fff;border:none;padding:9px 16px;border-radius:10px;font-weight:700;font-size:.83rem;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;"
                     onclick="metaConnectWithToken()">
                     <i class="ti ti-plug-connected"></i> Conectar
                   </button>
                 </div>
-                <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;">
-
-                  <button class="ab sp" onclick="metaShowTokenGuide()" style="font-size:.72rem;">
-                    <i class="ti ti-help-circle"></i> Cómo obtener el token
+                <div style="background:rgba(245,158,11,.1);border-radius:9px;padding:9px 12px;font-size:.78rem;color:#92400E;margin-bottom:7px;line-height:1.55;">
+                  ⏱ Los tokens expiran en 60 días. Si ves "Session expired", genera uno nuevo en <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:#1877F2;font-weight:700;">Graph API Explorer</a> y pégalo arriba.
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <a href="https://developers.facebook.com/tools/explorer/" target="_blank"
+                    style="padding:7px 12px;border-radius:9px;background:#1877F2;color:#fff;text-decoration:none;font-size:.78rem;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                    <i class="ti ti-external-link"></i> Graph Explorer
+                  </a>
+                  <button class="ab" onclick="metaInit()" style="font-size:.78rem;">
+                    <i class="ti ti-refresh"></i> Reconectar
                   </button>
-                  <button class="ab" onclick="metaInit()" style="font-size:.72rem;">
-                    <i class="ti ti-refresh"></i> Actualizar datos
+                  <button class="ab dl" onclick="metaClearToken()" style="font-size:.78rem;">
+                    <i class="ti ti-trash"></i> Borrar token guardado
                   </button>
                 </div>
               </div>
-            </div>
+            </div></div>
           </div>
           <div class="soc-item">
             <div class="soc-ic" style="background:#000;"><i class="ti ti-brand-tiktok"></i></div>
@@ -3252,44 +3260,67 @@ var META_CONFIG = {
   connected:   false,
 };
 
-// ── ENTRY POINT: conectar o actualizar ───────────────────────────
-// Llama esto siempre — maneja token vacío, restauración y refresh
+// ── ENTRY POINT ──────────────────────────────────────────────────
 function metaInit() {
   var token = '';
   try { token = localStorage.getItem('ab_meta_token') || ''; } catch(e) {}
+  metaDebug('Token guardado: ' + (token ? token.substring(0,12)+'…' : 'NINGUNO'));
   if (!token || token.length < 20) {
     metaSetStatus('sin-token');
+    metaDebug('Sin token — ingresa uno nuevo');
     return;
   }
   META_CONFIG.accessToken = token;
   META_CONFIG.connected   = true;
-  // Try to restore cached account ID (avoid extra API call)
   try {
     var cached = JSON.parse(localStorage.getItem('ab_meta_account') || '{}');
-    if (cached.id) {
-      META_CONFIG.adAccountId = cached.id;
-      META_CONFIG.accountName = cached.name || '';
-    }
+    if (cached.id) { META_CONFIG.adAccountId = cached.id; META_CONFIG.accountName = cached.name || ''; }
   } catch(e) {}
-  // Always verify token + load fresh data
+  metaDebug('Iniciando verificación con Meta API…');
+  metaSetStatus('cargando');
   metaVerifyAndLoad(token);
+}
+
+function metaDebug(msg) {
+  console.log('[Meta]', msg);
+  var el = document.getElementById('meta-debug');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+function metaClearToken() {
+  try { localStorage.removeItem('ab_meta_token'); localStorage.removeItem('ab_meta_account'); localStorage.removeItem('ab_meta_campaigns'); } catch(e) {}
+  META_CONFIG.accessToken = ''; META_CONFIG.adAccountId = ''; META_CONFIG.connected = false;
+  metaSetStatus('sin-token');
+  metaDebug('Token borrado — ingresa uno nuevo');
+  metaShowEmptyState();
+  toast('Token eliminado · ingresa uno nuevo en Redes Sociales');
 }
 
 // ── VERIFY TOKEN → LOAD ACCOUNTS → LOAD CAMPAIGNS ───────────────
 function metaVerifyAndLoad(token) {
   metaSetStatus('cargando');
-  // Step 1: verify token /me
+  metaDebug('Llamando a graph.facebook.com/me…');
   fetch('https://graph.facebook.com/v19.0/me?fields=id,name&access_token=' + token)
     .then(function(r) { return r.json(); })
     .then(function(me) {
       if (me.error) {
-        console.warn('Meta token error:', me.error.message);
-        metaSetStatus('token-invalido', me.error.message);
+        var errMsg = me.error.message || 'Token inválido';
+        console.warn('Meta token error:', errMsg);
+        metaDebug('Error: ' + errMsg);
+        metaSetStatus('token-invalido', errMsg);
+        // Clear expired token so next init doesn't retry with bad token
         try { localStorage.removeItem('ab_meta_token'); } catch(e) {}
+        META_CONFIG.connected = false;
+        // Update the status dot to red
+        var dot = document.getElementById('meta-status-dot');
+        if (dot) dot.style.background = '#DC2626';
         return;
       }
       META_CONFIG.userName = me.name || 'Usuario';
-      // Step 2: load ad accounts
+      metaDebug('Usuario: ' + META_CONFIG.userName + ' · cargando cuentas…');
+      // Update dot to green
+      var dot = document.getElementById('meta-status-dot');
+      if (dot) dot.style.background = '#059669';
       return fetch('https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_status&limit=10&access_token=' + token)
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -3333,14 +3364,17 @@ function metaFetchCampaigns(token, accountId) {
     + '/campaigns?fields=' + encodeURIComponent(fields)
     + '&limit=20&access_token=' + token;
 
+  metaDebug('Cargando campañas de ' + accountId + '…');
   fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.error) {
         console.warn('Campaigns error:', data.error.message);
+        metaDebug('Error campañas: ' + data.error.message);
         metaShowNoAdsState();
         return;
       }
+      metaDebug((data.data||[]).length + ' campañas recibidas');
       var campaigns = (data.data || []).map(function(c) {
         var ins = (c.insights && c.insights.data && c.insights.data[0]) || {};
         var leads = ((ins.actions || []).find(function(a) {
@@ -3467,6 +3501,9 @@ function metaSetStatus(state, extra) {
     var el = document.getElementById(id);
     if (el) { el.textContent = msg; el.style.color = color; }
   });
+  // Update indicator dot
+  var dot = document.getElementById('meta-status-dot');
+  if (dot) dot.style.background = (state === 'conectado') ? '#059669' : (state === 'cargando') ? '#F59E0B' : '#DC2626';
 }
 
 function metaUpdateConnectStatus(count) {
