@@ -3254,8 +3254,8 @@ var META_CONFIG = {
 
 var META_CONFIG = {
   accessToken: '',
-  adAccountId: '',
-  accountName: '',
+  adAccountId: 'act_377276466367241',  // CARTAGENA — cuenta publicitaria Ingenal
+  accountName: 'CARTAGENA',
   userName:    '',
   connected:   false,
 };
@@ -3272,11 +3272,10 @@ function metaInit() {
   }
   META_CONFIG.accessToken = token;
   META_CONFIG.connected   = true;
-  try {
-    var cached = JSON.parse(localStorage.getItem('ab_meta_account') || '{}');
-    if (cached.id) { META_CONFIG.adAccountId = cached.id; META_CONFIG.accountName = cached.name || ''; }
-  } catch(e) {}
-  metaDebug('Iniciando verificación con Meta API…');
+  // Always use CARTAGENA account (ID fixed)
+  META_CONFIG.adAccountId = 'act_377276466367241';
+  META_CONFIG.accountName = 'CARTAGENA · Ingenal';
+  metaDebug('Cuenta: CARTAGENA (act_377276466367241) · verificando token…');
   metaSetStatus('cargando');
   metaVerifyAndLoad(token);
 }
@@ -3357,63 +3356,141 @@ function metaVerifyAndLoad(token) {
     });
 }
 
-// ── FETCH CAMPAIGNS ──────────────────────────────────────────────
+// ── FETCH CAMPAIGNS — robust multi-step approach ─────────────────
 function metaFetchCampaigns(token, accountId) {
-  var fields = 'name,status,objective,insights.date_preset(last_7d){reach,impressions,clicks,spend,cpc,ctr,actions}';
-  var url = 'https://graph.facebook.com/v19.0/' + accountId
-    + '/campaigns?fields=' + encodeURIComponent(fields)
-    + '&limit=20&access_token=' + token;
-
   metaDebug('Cargando campañas de ' + accountId + '…');
-  fetch(url)
+
+  // Step A: get all campaigns (any status, no date filter) to confirm access
+  var urlAll = 'https://graph.facebook.com/v19.0/' + accountId
+    + '/campaigns?fields=id,name,status,objective&limit=50&access_token=' + token;
+
+  fetch(urlAll)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.error) {
-        console.warn('Campaigns error:', data.error.message);
-        metaDebug('Error campañas: ' + data.error.message);
+        metaDebug('Error: ' + data.error.message + ' (code ' + data.error.code + ')');
+        // act_ prefix already included
+        metaDebug('Error API: ' + data.error.message + ' (code:' + data.error.code + ')');
+        metaDebug('Verifica que el token tenga ads_read sobre act_377276466367241');
         metaShowNoAdsState();
         return;
       }
-      metaDebug((data.data||[]).length + ' campañas recibidas');
-      var campaigns = (data.data || []).map(function(c) {
-        var ins = (c.insights && c.insights.data && c.insights.data[0]) || {};
-        var leads = ((ins.actions || []).find(function(a) {
-          return a.action_type === 'lead' || a.action_type === 'onsite_conversion.lead_grouped';
-        }) || {}).value || 0;
-        return {
-          id:          c.id,
-          name:        c.name,
-          status:      c.status,
-          objective:   c.objective || '',
-          reach:       parseInt(ins.reach || 0),
-          impressions: parseInt(ins.impressions || 0),
-          clicks:      parseInt(ins.clicks || 0),
-          spend:       parseFloat(ins.spend || 0),
-          spendCOP:    Math.round(parseFloat(ins.spend || 0) * 4200),
-          cpc:         parseFloat(ins.cpc || 0),
-          ctr:         parseFloat(ins.ctr || 0),
-          leads:       parseInt(leads),
-        };
-      });
-      // Cache for offline use
-      try { localStorage.setItem('ab_meta_campaigns', JSON.stringify(campaigns)); } catch(e) {}
-      metaRenderDashboard(campaigns);
-      metaUpdateConnectStatus(campaigns.length);
-      toast('✓ Meta Ads · ' + campaigns.length + ' campañas cargadas en tiempo real');
+
+      var allCamps = data.data || [];
+      metaDebug('Total campañas en cuenta: ' + allCamps.length);
+
+      if (!allCamps.length) {
+        metaDebug('⚠ La cuenta act_377276466367241 (CARTAGENA) no tiene campañas visibles con este token');
+        metaDebug('Verifica que el token tenga permiso ads_read sobre esta cuenta');
+        metaShowNoAdsState();
+        return;
+      }
+
+      // Step B: get insights for last 30 days (wider window to catch more data)
+      var ids = allCamps.slice(0,10).map(function(c){ return c.id; }).join(',');
+      var fieldsWithInsights = 'name,status,insights.date_preset(last_30d){reach,impressions,clicks,spend,cpc,ctr,actions,cost_per_action_type}';
+      var urlInsights = 'https://graph.facebook.com/v19.0/' + accountId
+        + '/campaigns?fields=' + encodeURIComponent(fieldsWithInsights)
+        + '&limit=50&access_token=' + token;
+
+      fetch(urlInsights)
+        .then(function(r) { return r.json(); })
+        .then(function(d2) {
+          if (d2.error) {
+            metaDebug('Insights error: ' + d2.error.message + ' — mostrando campañas sin métricas');
+            // Show campaigns without metrics
+            var camps = allCamps.map(function(c) {
+              return { id:c.id, name:c.name, status:c.status, objective:c.objective||'',
+                reach:0, impressions:0, clicks:0, spend:0, spendCOP:0, cpc:0, ctr:0, leads:0 };
+            });
+            metaRenderDashboard(camps);
+            metaUpdateConnectStatus(camps.length);
+            return;
+          }
+
+          var campaigns = (d2.data || []).map(function(c) {
+            var ins = (c.insights && c.insights.data && c.insights.data[0]) || {};
+            // Count leads from all action types
+            var actions = ins.actions || [];
+            var leadTypes = ['lead','onsite_conversion.lead_grouped','onsite_conversion.messaging_first_reply',
+                            'onsite_conversion.total_messaging_connection','contact'];
+            var leads = actions.filter(function(a){ return leadTypes.indexOf(a.action_type) >= 0; })
+                               .reduce(function(s,a){ return s + parseInt(a.value||0); }, 0);
+            // Clicks to WhatsApp
+            var waClicks = (actions.find(function(a){ return a.action_type === 'click_to_whatsapp'; }) || {}).value || 0;
+            var spendUSD = parseFloat(ins.spend || 0);
+            var spendCOP = Math.round(spendUSD * 4200);
+            return {
+              id:          c.id,
+              name:        c.name,
+              status:      c.status,
+              objective:   c.objective || '',
+              reach:       parseInt(ins.reach || 0),
+              impressions: parseInt(ins.impressions || 0),
+              clicks:      parseInt(ins.clicks || 0),
+              spend:       spendUSD,
+              spendCOP:    spendCOP,
+              cpc:         parseFloat(ins.cpc || 0),
+              ctr:         parseFloat(ins.ctr || 0),
+              leads:       parseInt(leads),
+              waClicks:    parseInt(waClicks),
+            };
+          });
+
+          metaDebug('✓ ' + campaigns.length + ' campañas con métricas · 30 días');
+          try { localStorage.setItem('ab_meta_campaigns', JSON.stringify(campaigns)); } catch(e) {}
+          metaRenderDashboard(campaigns);
+          metaUpdateConnectStatus(campaigns.length);
+          toast('✓ Meta Ads · ' + campaigns.length + ' campañas · últimos 30 días');
+        })
+        .catch(function(e) {
+          metaDebug('Error insights: ' + e.message);
+          // Fallback: show campaign names without metrics
+          var camps = allCamps.map(function(c) {
+            return {id:c.id,name:c.name,status:c.status,reach:0,impressions:0,clicks:0,spend:0,spendCOP:0,leads:0,waClicks:0};
+          });
+          metaRenderDashboard(camps);
+          metaUpdateConnectStatus(camps.length);
+        });
     })
     .catch(function(err) {
-      console.warn('Campaigns fetch error:', err);
-      // Try cached campaigns
+      metaDebug('Error de red: ' + (err.message || err));
+      // Try cached
       try {
         var cached = JSON.parse(localStorage.getItem('ab_meta_campaigns') || '[]');
-        if (cached.length) {
-          metaRenderDashboard(cached);
-          toast('Datos de campañas desde caché · sin conexión a Meta');
-        } else {
-          metaShowNoAdsState();
-        }
+        if (cached.length) { metaRenderDashboard(cached); toast('Datos desde caché'); }
+        else metaShowNoAdsState();
       } catch(e) { metaShowNoAdsState(); }
     });
+}
+
+// Try all ad accounts if first one has no campaigns
+function metaTryAllAccounts(token) {
+  fetch('https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_status&limit=20&access_token=' + token)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var accounts = d.data || [];
+      metaDebug('Cuentas totales: ' + accounts.length + ' · buscando campañas…');
+      // Try each account
+      var found = false;
+      accounts.forEach(function(acct) {
+        if (found) return;
+        fetch('https://graph.facebook.com/v19.0/' + acct.id + '/campaigns?fields=id,name&limit=1&access_token=' + token)
+          .then(function(r){ return r.json(); })
+          .then(function(cd){
+            if (!found && cd.data && cd.data.length > 0) {
+              found = true;
+              META_CONFIG.adAccountId = acct.id;
+              META_CONFIG.accountName = acct.name;
+              try { localStorage.setItem('ab_meta_account', JSON.stringify({id:acct.id, name:acct.name})); } catch(e) {}
+              metaDebug('Campañas encontradas en: ' + acct.name);
+              metaFetchCampaigns(token, acct.id);
+            }
+          });
+      });
+      setTimeout(function(){ if (!found) { metaDebug('Sin campañas en ninguna cuenta'); metaShowNoAdsState(); } }, 5000);
+    })
+    .catch(function(){ metaShowNoAdsState(); });
 }
 
 // ── RENDER DASHBOARD ─────────────────────────────────────────────
@@ -3442,31 +3519,48 @@ function metaRenderDashboard(campaigns) {
     row.style.cursor = 'pointer';
     row.title = c.name;
     row.innerHTML = '<div style="min-width:0;">'
-      + '<div class="camp-name" style="display:flex;align-items:center;">' + dot + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + c.name.substring(0, 30) + (c.name.length > 30 ? '…' : '') + '</span></div>'
+      + '<div class="camp-name" style="display:flex;align-items:center;">' + dot + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + c.name + '">' + c.name.substring(0, 28) + (c.name.length > 28 ? '…' : '') + '</span></div>'
       + '<div class="camp-bar"><div class="camp-bar-fill" style="width:' + pct + '%"></div></div>'
       + '</div>'
-      + '<span>' + fmtNum(c.reach) + '</span>'
-      + '<span>' + fmtNum(c.clicks) + '</span>'
-      + '<span>' + (c.leads > 0 ? c.leads : '—') + '</span>'
-      + '<span>' + fmtCOP(c.spendCOP) + '</span>'
-      + '<span>' + (c.spendCOP > 0 && c.leads > 0 ? '<span class="pill p-d">' + fmtCOP(Math.round(c.spendCOP / c.leads)) + '</span>' : '—') + '</span>';
+      + '<span>' + (c.reach > 0 ? fmtNum(c.reach) : '—') + '</span>'
+      + '<span>' + (c.clicks > 0 ? fmtNum(c.clicks) : '—') + '</span>'
+      + '<span>' + (c.leads > 0 ? '<strong style="color:var(--green);">' + c.leads + '</strong>' : (c.waClicks > 0 ? '<span title="WhatsApp">💬' + c.waClicks + '</span>' : '—')) + '</span>'
+      + '<span>' + (c.spendCOP > 0 ? fmtCOP(c.spendCOP) : '—') + '</span>'
+      + '<span>' + (c.spendCOP > 0 && c.leads > 0 ? '<span class="pill p-d">' + fmtCOP(Math.round(c.spendCOP/c.leads)) + '</span>' : '—') + '</span>';
     tableWrap.appendChild(row);
   });
 
   // Update KPIs
-  var totalReach  = campaigns.reduce(function(s,c){ return s+(c.reach||0); }, 0);
-  var totalImpr   = campaigns.reduce(function(s,c){ return s+(c.impressions||0); }, 0);
-  var totalSpend  = campaigns.reduce(function(s,c){ return s+(c.spendCOP||0); }, 0);
-  var totalLeads  = campaigns.reduce(function(s,c){ return s+(c.leads||0); }, 0);
-  var totalClicks = campaigns.reduce(function(s,c){ return s+(c.clicks||0); }, 0);
-  var avgCpr      = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
-  var activeCamps = campaigns.filter(function(c){ return c.status === 'ACTIVE'; }).length;
+  var totalReach   = campaigns.reduce(function(s,c){ return s+(c.reach||0); }, 0);
+  var totalImpr    = campaigns.reduce(function(s,c){ return s+(c.impressions||0); }, 0);
+  var totalSpend   = campaigns.reduce(function(s,c){ return s+(c.spendCOP||0); }, 0);
+  var totalLeads   = campaigns.reduce(function(s,c){ return s+(c.leads||0); }, 0);
+  var totalClicks  = campaigns.reduce(function(s,c){ return s+(c.clicks||0); }, 0);
+  var totalWA      = campaigns.reduce(function(s,c){ return s+(c.waClicks||0); }, 0);
+  var avgCpr       = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
+  var activeCamps  = campaigns.filter(function(c){ return c.status === 'ACTIVE'; }).length;
 
-  setEl('kpi-reach', fmtNum(totalReach));
-  setEl('kpi-impr',  fmtNum(totalImpr));
-  setEl('kpi-cpr',   avgCpr > 0 ? fmtCOP(avgCpr) : '—');
-  setEl('kpi-spend', fmtCOP(totalSpend));
-  setEl('dash-camps', activeCamps > 0 ? activeCamps : '—');
+  setEl('kpi-reach',  totalReach > 0  ? fmtNum(totalReach)  : '0');
+  setEl('kpi-impr',   totalImpr > 0   ? fmtNum(totalImpr)   : '0');
+  setEl('kpi-cpr',    avgCpr > 0      ? fmtCOP(avgCpr)      : '—');
+  setEl('kpi-spend',  totalSpend > 0  ? fmtCOP(totalSpend)  : '$0');
+  setEl('dash-camps', activeCamps > 0 ? activeCamps         : '0');
+  setEl('dash-leads', typeof crmLeads !== 'undefined' ? crmLeads.length : '—');
+
+  // Show WA clicks if available
+  if (totalWA > 0) {
+    var waEl = document.getElementById('kpi-wa');
+    if (!waEl) {
+      // Add WA KPI box if not present
+      var kpiGrid = document.querySelector('#vw-desk .mp .g2');
+      if (kpiGrid) {
+        var box = document.createElement('div');
+        box.className = 'mkt-box';
+        box.innerHTML = '<div class="mkt-l">Clics a WhatsApp</div><div class="mkt-v" id="kpi-wa">' + fmtNum(totalWA) + '</div>';
+        kpiGrid.appendChild(box);
+      }
+    } else { waEl.textContent = fmtNum(totalWA); }
+  }
 
   // Connect status on dashboard
   var sc = document.getElementById('meta-connect-status');
@@ -3476,7 +3570,17 @@ function metaRenderDashboard(campaigns) {
 function metaShowNoAdsState() {
   var empty = document.getElementById('dash-campaigns-empty');
   var tableWrap = document.getElementById('dash-campaigns-table');
-  if (empty) { empty.style.display = 'block'; empty.innerHTML = '<div style="text-align:center;padding:28px 0;color:var(--ink3);"><i class="ti ti-ad-off" style="font-size:2rem;display:block;margin-bottom:8px;opacity:.4;"></i><div style="font-size:.83rem;">Token conectado · sin campañas activas en los últimos 7 días</div><button class="ab sp" style="margin-top:10px;" onclick="metaInit()">Reintentar</button></div>'; }
+  if (empty) {
+    empty.style.display = 'block';
+    empty.innerHTML = '<div style="text-align:center;padding:28px 0;color:var(--ink3);">'
+      + '<i class="ti ti-ad-off" style="font-size:2rem;display:block;margin-bottom:8px;opacity:.4;"></i>'
+      + '<div style="font-size:.83rem;margin-bottom:6px;">Sin campañas · cuenta <strong>CARTAGENA</strong> (act_377276466367241)</div>'
+      + '<div style="font-size:.77rem;color:var(--ink3);">Asegúrate que el token tenga permiso <strong>ads_read</strong> sobre esta cuenta</div>'
+      + '<div style="display:flex;gap:7px;justify-content:center;margin-top:12px;">'
+      + '<button class="ab sp" onclick="metaInit()">Reintentar</button>'
+      + '<button class="ab" onclick="navToMetaSettings()">Nuevo token</button>'
+      + '</div></div>';
+  }
   if (tableWrap) tableWrap.style.display = 'none';
 }
 
@@ -3507,7 +3611,7 @@ function metaSetStatus(state, extra) {
 }
 
 function metaUpdateConnectStatus(count) {
-  metaSetStatus('conectado', META_CONFIG.userName + ' · ' + META_CONFIG.accountName);
+  metaSetStatus('conectado', META_CONFIG.userName + ' · CARTAGENA · Ingenal');
   var sc = document.getElementById('meta-connect-status');
   if (sc) { sc.textContent = '● Tiempo real · ' + count + ' campañas'; sc.style.color = '#059669'; }
 }
@@ -3672,6 +3776,7 @@ function updateDashboardStats() {
 }
 
 function omInvForm(){om('inv-form');}
+function navToMetaSettings(){nav('cfg');setTimeout(function(){sNav('redes',document.querySelectorAll('.sni')[4]);},100);}
 function navCRM(){nav('crm');}
 function navSim(){nav('sim');}
 function navCfg(){nav('cfg');}
