@@ -1607,8 +1607,9 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
                     <i class="ti ti-plug-connected"></i> Conectar
                   </button>
                 </div>
-                <div style="background:rgba(245,158,11,.1);border-radius:9px;padding:9px 12px;font-size:.78rem;color:#92400E;margin-bottom:7px;line-height:1.55;">
-                  ⏱ Los tokens expiran en 60 días. Si ves "Session expired", genera uno nuevo en <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:#1877F2;font-weight:700;">Graph API Explorer</a> y pégalo arriba.
+                <div style="background:rgba(245,158,11,.1);border-radius:9px;padding:9px 12px;font-size:.78rem;color:#92400E;margin-bottom:7px;line-height:1.6;">
+                  <strong>Paso requerido para datos en tiempo real:</strong><br>
+                  En <a href="https://developers.facebook.com/apps" target="_blank" style="color:#1877F2;font-weight:700;">Meta Developers → tu app → Configuración básica</a> agrega <strong>kijuan89.github.io</strong> en <em>Dominios de la app</em>. Sin esto Meta bloquea las llamadas desde tu sitio.
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                   <a href="https://developers.facebook.com/tools/explorer/" target="_blank"
@@ -3299,7 +3300,7 @@ function metaClearToken() {
 function metaVerifyAndLoad(token) {
   metaSetStatus('cargando');
   metaDebug('Llamando a graph.facebook.com/me…');
-  fetch('https://graph.facebook.com/v19.0/me?fields=id,name&access_token=' + token)
+  fetch('https://graph.facebook.com/v19.0/me?fields=id,name&access_token=' + token, { method:'GET', mode:'cors' })
     .then(function(r) { return r.json(); })
     .then(function(me) {
       if (me.error) {
@@ -3372,7 +3373,7 @@ function metaFetchCampaigns(token, accountId) {
     + '/campaigns?fields=' + encodeURIComponent(fields)
     + '&limit=50&access_token=' + token;
 
-  fetch(url)
+  fetch(url, { method: 'GET', mode: 'cors' })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       // API error
@@ -3449,24 +3450,41 @@ function metaFetchCampaigns(token, accountId) {
     });
 }
 
-// Show neutral "loading" state — no error text visible to client
+// Show neutral waiting state — no loop, no technical details
+var _metaRetryCount = 0;
 function metaShowLoadingCampaigns() {
   var empty = document.getElementById('dash-campaigns-empty');
   var tableWrap = document.getElementById('dash-campaigns-table');
+  if (tableWrap) tableWrap.style.display = 'none';
+
+  // After 2 retries, stop looping and show clean message
+  _metaRetryCount++;
+  if (_metaRetryCount > 2) {
+    _metaRetryCount = 0;
+    if (empty) {
+      empty.style.display = 'block';
+      empty.innerHTML = '<div style="text-align:center;padding:28px 0;">'
+        + '<i class="ti ti-chart-bar" style="font-size:2rem;display:block;margin-bottom:8px;opacity:.25;"></i>'
+        + '<div style="font-size:.84rem;color:var(--ink2);">Sincronizando con Meta Ads</div>'
+        + '<button class="ab sp" style="margin-top:12px;" onclick="_metaRetryCount=0;metaInit()">↻ Actualizar</button>'
+        + '</div>';
+    }
+    return;
+  }
+
   if (empty) {
     empty.style.display = 'block';
     empty.innerHTML = '<div style="text-align:center;padding:32px 0;">'
-      + '<div style="width:36px;height:36px;border-radius:50%;border:3px solid rgba(99,102,241,.2);border-top-color:#6366F1;animation:spin 1s linear infinite;margin:0 auto 12px;"></div>'
-      + '<div style="font-size:.84rem;color:var(--ink2);">Cargando datos de campañas…</div>'
+      + '<div style="width:32px;height:32px;border-radius:50%;border:3px solid rgba(99,102,241,.15);border-top-color:#6366F1;animation:spin 1s linear infinite;margin:0 auto 10px;"></div>'
+      + '<div style="font-size:.83rem;color:var(--ink2);">Cargando campañas…</div>'
       + '</div>';
   }
-  if (tableWrap) tableWrap.style.display = 'none';
-  // Retry in 4s
+  // Single retry after 3s
   setTimeout(function() {
     if (META_CONFIG.accessToken && META_CONFIG.adAccountId) {
       metaFetchCampaigns(META_CONFIG.accessToken, META_CONFIG.adAccountId);
     }
-  }, 4000);
+  }, 3000);
 }
 
 
