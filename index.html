@@ -711,46 +711,58 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
       <div style="display:flex;align-items:center;gap:7px;"><span style="font-size:.71rem;color:var(--ink2);">Filtrar:</span><select style="width:auto;padding:7px 12px;"><option>últimos 7 días</option><option>últimos 30 días</option></select></div>
     </div>
     <div class="stats">
-      <div class="sc gl2" onclick="nav('inv')"><div class="sc-l">Disponibles</div><div class="sc-v">120</div></div>
-      <div class="sc gl2" onclick="nav('crm')"><div class="sc-l">Clientes potenciales</div><div class="sc-v">48</div></div>
-      <div class="sc gl2"><div class="sc-l">Campañas activas</div><div class="sc-v">3</div></div>
-      <div class="sc gl2" onclick="nav('cot')"><div class="sc-l">Cotizaciones</div><div class="sc-v">14</div></div>
-      <div class="sc gl2" onclick="nav('crm')"><div class="sc-l">Visitas</div><div class="sc-v">7</div></div>
+      <div class="sc gl2" onclick="nav('inv')"><div class="sc-l">Disponibles</div><div class="sc-v" id="dash-disp">—</div></div>
+      <div class="sc gl2" onclick="navCRM()"><div class="sc-l">Clientes potenciales</div><div class="sc-v" id="dash-leads">—</div></div>
+      <div class="sc gl2"><div class="sc-l">Campañas activas</div><div class="sc-v" id="dash-camps">—</div></div>
+      <div class="sc gl2" onclick="nav('cot')"><div class="sc-l">Cotizaciones</div><div class="sc-v" id="dash-cots">—</div></div>
+      <div class="sc gl2" onclick="navCRM()"><div class="sc-l">Visitas</div><div class="sc-v" id="dash-visits">—</div></div>
     </div>
     <div class="g2">
       <div class="mp gl2">
-        <div class="mp-t">Clientes Potenciales <button class="ab sp" onclick="om('lead')">+ Nuevo</button></div>
-        <div class="tw"><table class="dt"><thead><tr><th>Nombre</th><th>Campaña</th><th>Estado</th></tr></thead><tbody>
-          <tr><td>Carlos Mendoza</td><td>Vive en Janeiro</td><td><span class="pill p-s">Sin contactar</span></td></tr>
-          <tr><td>Ana Lucía Torres</td><td>Torre 1 Cartagena</td><td><span class="pill p-d">Contactado</span></td></tr>
-          <tr><td>Rodrigo Vargas</td><td>EDGE certificación</td><td><span class="pill p-s">Sin contactar</span></td></tr>
-        </tbody></table></div>
+        <div class="mp-t">Clientes Potenciales <button class="ab sp" onclick="navCRM()">Ver CRM</button></div>
+        <div id="dash-leads-preview">
+          <div style="text-align:center;padding:28px 0;color:var(--ink3);">
+            <i class="ti ti-users" style="font-size:2rem;display:block;margin-bottom:8px;opacity:.4;"></i>
+            <div style="font-size:.83rem;">Los leads registrados aparecerán aquí</div>
+            <button class="ab sp" style="margin-top:10px;" onclick="navCRM()">Ir al CRM →</button>
+          </div>
+        </div>
       </div>
       <div class="mp gl2">
-        <div class="mp-t">Marketing · Últimas 5 campañas</div>
-        <div class="camp-row hdr"><span>Campaña</span><span>Alcance</span><span>Clics</span><span>Leads</span><span>Gasto</span><span>CxR</span></div>
-        <div class="camp-row"><div><div class="camp-name">Vive en Janeiro</div><div class="camp-bar"><div class="camp-bar-fill" style="width:72%"></div></div></div><span>12,400</span><span>920</span><span>68</span><span>$265K</span><span><span class="pill p-d">$3.9K</span></span></div>
-        <div class="camp-row"><div><div class="camp-name">Torre 1 Cartagena</div><div class="camp-bar"><div class="camp-bar-fill" style="width:58%"></div></div></div><span>8,200</span><span>610</span><span>44</span><span>$229K</span><span><span class="pill p-d">$5.2K</span></span></div>
-        <div class="camp-row"><div><div class="camp-name">EDGE Sostenible</div><div class="camp-bar"><div class="camp-bar-fill" style="width:45%"></div></div></div><span>5,100</span><span>380</span><span>29</span><span>$140K</span><span><span class="pill p-s">$4.8K</span></span></div>
-        <div class="camp-row"><div><div class="camp-name">Inversión Carioca</div><div class="camp-bar"><div class="camp-bar-fill" style="width:33%"></div></div></div><span>3,800</span><span>290</span><span>21</span><span>$98K</span><span><span class="pill p-s">$4.7K</span></span></div>
-        <div class="camp-row"><div><div class="camp-name">Cartagena Patrimonio</div><div class="camp-bar"><div class="camp-bar-fill" style="width:22%"></div></div></div><span>2,200</span><span>168</span><span>12</span><span>$55K</span><span><span class="pill p-s">$4.6K</span></span></div>
+        <div class="mp-t" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Marketing · Meta Ads</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span id="meta-connect-status" style="font-size:.71rem;color:var(--ink3);">Sin conexión</span>
+            <button class="ab sp" onclick="sNav('redes',document.querySelector('.sni'));nav('cfg');" style="font-size:.71rem;">Conectar Meta</button>
+          </div>
+        </div>
+        <div id="dash-campaigns-container">
+          <div id="dash-campaigns-empty" style="text-align:center;padding:28px 0;color:var(--ink3);">
+            <i class="ti ti-chart-bar" style="font-size:2rem;display:block;margin-bottom:8px;opacity:.4;"></i>
+            <div style="font-size:.83rem;">Conecta Meta Ads para ver tus campañas en tiempo real</div>
+            <button class="ab sp" style="margin-top:10px;" onclick="sNav('redes',document.querySelector('.sni'));nav('cfg');">Conectar en Ajustes →</button>
+          </div>
+          <div id="dash-campaigns-table" style="display:none;">
+            <div class="camp-row hdr"><span>Campaña</span><span>Alcance</span><span>Clics</span><span>Leads</span><span>Gasto</span><span>CxR</span></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="g2" style="margin-top:13px;">
       <div class="mp gl2">
-        <div class="mp-t">KPIs de marketing · 7 días</div>
+        <div class="mp-t">KPIs de marketing · Meta Ads en tiempo real</div>
         <div class="g2">
-          <div class="mkt-box"><div class="mkt-l">Alcance total</div><div class="mkt-v">31.7K</div></div>
-          <div class="mkt-box"><div class="mkt-l">Impresiones</div><div class="mkt-v">118K</div></div>
-          <div class="mkt-box"><div class="mkt-l">Costo/resultado</div><div class="mkt-v">$4.4K</div></div>
-          <div class="mkt-box"><div class="mkt-l">Gasto total</div><div class="mkt-v">$787K</div></div>
+          <div class="mkt-box"><div class="mkt-l">Alcance total</div><div class="mkt-v" id="kpi-reach">—</div></div>
+          <div class="mkt-box"><div class="mkt-l">Impresiones</div><div class="mkt-v" id="kpi-impr">—</div></div>
+          <div class="mkt-box"><div class="mkt-l">Costo/resultado</div><div class="mkt-v" id="kpi-cpr">—</div></div>
+          <div class="mkt-box"><div class="mkt-l">Gasto total</div><div class="mkt-v" id="kpi-spend">—</div></div>
         </div>
       </div>
       <div class="mp gl2">
-        <div class="mp-t">Calidad de leads</div>
-        <div class="cp-row"><span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block;"></span>Alta calidad</span><strong style="color:var(--green);">58 leads</strong></div>
-        <div class="cp-row"><span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--amber);display:inline-block;"></span>Media calidad</span><strong style="color:var(--amber);">54 leads</strong></div>
-        <div class="cp-row"><span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block;"></span>Baja calidad</span><strong style="color:var(--red);">30 leads</strong></div>
+        <div class="mp-t">Calidad de leads · CRM</div>
+        <div class="cp-row"><span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block;"></span>Alta calidad ★4-5</span><strong style="color:var(--green);" id="kpi-hot">—</strong></div>
+        <div class="cp-row"><span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--amber);display:inline-block;"></span>Media calidad ★3</span><strong style="color:var(--amber);" id="kpi-mid">—</strong></div>
+        <div class="cp-row"><span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block;"></span>Baja calidad ★1-2</span><strong style="color:var(--red);" id="kpi-low">—</strong></div>
       </div>
     </div>
   </div>
@@ -830,11 +842,11 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
     </div>
     <div class="card gl2"><div class="tw"><table class="dt"><thead><tr><th>Bloque</th><th>Apto</th><th>Tipología</th><th>Área</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>
       <tbody id="invtbl">
-        <tr data-s="Disponible"><td>1A</td><td>101</td><td>Opción 01</td><td>65m²</td><td>$399M</td><td><span class="pill p-d">Disponible</span></td><td><div style="display:flex;gap:4px;"><button class="ab ed" onclick="om('inv-form')">Editar</button><button class="ab sp" onclick="om('sep')">Separar</button><button class="ab dl" onclick="om('del')">Eliminar</button></div></td></tr>
-        <tr data-s="Disponible"><td>1B</td><td>102</td><td>Opción 02</td><td>65m²</td><td>$415M</td><td><span class="pill p-d">Disponible</span></td><td><div style="display:flex;gap:4px;"><button class="ab ed" onclick="om('inv-form')">Editar</button><button class="ab sp" onclick="om('sep')">Separar</button><button class="ab dl" onclick="om('del')">Eliminar</button></div></td></tr>
-        <tr data-s="Separado"><td>1C</td><td>103</td><td>Opción 01</td><td>65m²</td><td>$399M</td><td><span class="pill p-s">Separado</span></td><td><div style="display:flex;gap:4px;"><button class="ab ed" onclick="om('inv-form')">Editar</button><button class="ab dl" onclick="om('del')">Eliminar</button></div></td></tr>
-        <tr data-s="Vendido"><td>2A</td><td>101</td><td>Opción 02</td><td>65m²</td><td>$415M</td><td><span class="pill p-v">Vendido</span></td><td><div style="display:flex;gap:4px;"><button class="ab ed" onclick="om('inv-form')">Editar</button></div></td></tr>
-        <tr data-s="Disponible"><td>2B</td><td>104</td><td>Opción 01</td><td>65m²</td><td>$399M</td><td><span class="pill p-d">Disponible</span></td><td><div style="display:flex;gap:4px;"><button class="ab ed" onclick="om('inv-form')">Editar</button><button class="ab sp" onclick="om('sep')">Separar</button><button class="ab dl" onclick="om('del')">Eliminar</button></div></td></tr>
+        <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--ink3);">
+          <i class="ti ti-building-skyscraper" style="font-size:2rem;display:block;margin-bottom:8px;opacity:.4;"></i>
+          <div style="font-size:.83rem;">Sin unidades registradas · usa el SMARTIZER para importar el proyecto o agrégalas manualmente</div>
+          <button class="ab sp" style="margin-top:10px;" onclick="om('inv-form')">+ Agregar primera unidad</button>
+        </td></tr>
       </tbody>
     </table></div></div>
   </div>
@@ -1327,11 +1339,14 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
 </div>
 
 <!-- COTIZACIONES -->
-<div class="vw" id="vw-cot"><div class="tb"><div class="tb-left"><div class="tb-logo">J</div><span class="tb-title">Cotizaciones</span></div><div class="tb-right"><button class="btn btn-p" onclick="nav('sim')">+ Nueva cotización</button><div class="tb-clock"><strong class="lc">--:--:--</strong></div></div></div>
-  <div class="cnt"><div class="card gl2"><div class="tw"><table class="dt"><thead><tr><th>Cliente</th><th>Identificación</th><th>Tipología</th><th>Valor</th><th>Estado</th><th></th></tr></thead><tbody>
-    <tr><td>Carlos Mendoza</td><td>CC 80.234.567</td><td>Opción 01</td><td>$399M</td><td><span class="pill p-d">Enviada</span></td><td><button class="ab" onclick="toast('Descargando cotización…')">Descargar PDF</button></td></tr>
-    <tr><td>Ana Lucía Torres</td><td>CC 52.998.112</td><td>Opción 02</td><td>$415M</td><td><span class="pill p-s">Pendiente</span></td><td><button class="ab" onclick="toast('Descargando…')">Descargar PDF</button></td></tr>
-  </tbody></table></div></div></div>
+<div class="vw" id="vw-cot"><div class="tb"><div class="tb-left"><div class="tb-logo">J</div><span class="tb-title">Cotizaciones</span></div><div class="tb-right"><button class="btn btn-p" onclick="navSim()">+ Nueva cotización</button><div class="tb-clock"><strong class="lc">--:--:--</strong></div></div></div>
+  <div class="cnt"><div class="card gl2"><div class="tw"><table class="dt"><thead><tr><th>Cliente</th><th>Identificación</th><th>Tipología</th><th>Valor</th><th>Estado</th><th></th></tr></thead>
+    <tbody id="cotTbl"><tr><td colspan="6" style="text-align:center;padding:30px;color:var(--ink3);">
+      <i class="ti ti-file-invoice" style="font-size:2rem;display:block;margin-bottom:8px;opacity:.4;"></i>
+      <div style="font-size:.83rem;">Sin cotizaciones generadas · ve al Simulador para crear una</div>
+      <button class="ab sp" style="margin-top:10px;" onclick="navSim()">Ir al Simulador →</button>
+    </td></tr></tbody>
+  </table></div></div></div>
 </div>
 
 <!-- CRM v2 — Lead profiles from Salvador CSV -->
@@ -1590,14 +1605,12 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
                   </button>
                 </div>
                 <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;">
-                  <button class="ab" onclick="window.open('https://developers.facebook.com/tools/explorer/','_blank')" style="font-size:.72rem;">
-                    <i class="ti ti-tool"></i> Graph Explorer
-                  </button>
+
                   <button class="ab sp" onclick="metaShowTokenGuide()" style="font-size:.72rem;">
                     <i class="ti ti-help-circle"></i> Cómo obtener el token
                   </button>
-                  <button class="ab" onclick="metaUseDemoMode('fb-stat')" style="font-size:.72rem;">
-                    <i class="ti ti-chart-bar"></i> Ver datos demo
+                  <button class="ab" onclick="metaLoadInsights()" style="font-size:.72rem;">
+                    <i class="ti ti-refresh"></i> Actualizar datos
                   </button>
                 </div>
               </div>
@@ -1701,7 +1714,6 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
 <div class="ov" id="m-gdrive"><div class="modal"><div class="mh"><h3>Vincular Google Drive</h3><button class="mx" onclick="cm('gdrive')">×</button></div><div class="mb" style="text-align:center;"><i class="ti ti-brand-google-drive" style="font-size:2.6rem;color:#1FA463;"></i><p style="margin:10px 0;font-size:.88rem;">Conecta tu Google Drive para importar fotos, documentos y renders.</p></div><div class="mft"><button class="btn btn-o" onclick="cm('gdrive')">Cancelar</button><button class="btn btn-p" onclick="cm('gdrive');socConnect('google','')"><i class="ti ti-brand-google"></i>Vincular cuenta</button></div></div></div>
 
 <div class="ov" id="m-notif"><div class="modal"><div class="mh"><h3>Notificaciones</h3><button class="mx" onclick="cm('notif')">×</button></div><div class="mb">
-  <div class="cp-row"><span><span class="pill p-s" style="margin-right:7px;">Nuevo</span>Lead: Carlos Mendoza</span><strong>hace 4 min</strong></div>
   <div class="cp-row"><span><span class="pill p-d" style="margin-right:7px;">IA</span>Agente Jana agenda visita · Ana Torres</span><strong>hace 12 min</strong></div>
   <div class="cp-row"><span>Cotización enviada · Rodrigo Vargas</span><strong>hace 2h</strong></div>
 </div><div class="mft"><button class="btn btn-o" onclick="cm('notif')">Cerrar</button></div></div></div>
@@ -1796,6 +1808,7 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
 const ALL_VIEWS=['desk','proj-detail','inv','urb','edit','sim','cot','crm','ci','obra','ai','cfg'];
 function nav(id,el){
   if(id==='crm'){setTimeout(initCRM,50);}
+  if(id==='desk'){setTimeout(updateDashboardStats,100);}
   if(id==='urb'){setTimeout(urbLoadStoredFiles,100);}
   ALL_VIEWS.forEach(v=>{const p=document.getElementById('vw-'+v);if(p)p.classList.toggle('on',v===id);});
   document.querySelectorAll('.mn').forEach(b=>b.classList.remove('on'));
@@ -3052,6 +3065,88 @@ function szApplyExtracted(d) {
     });
   }
 
+  // ── Distribute towers to Torres y Tipologías tab ──
+  if (d.torres && d.torres.length) {
+    var container = document.getElementById('towersContainer');
+    if (container) {
+      container.innerHTML = '';
+      towerCount = 0;
+      d.torres.forEach(function(t, idx) {
+        towerCount++;
+        var tId = towerCount;
+        var sec = document.createElement('div');
+        sec.className = 'tower-section gl2';
+        sec.id = 'tower-' + tId;
+        if (idx > 0) sec.style.marginTop = '10px';
+        var hdr = document.createElement('div');
+        hdr.className = 'tower-hdr';
+        hdr.setAttribute('onclick', 'toggleTower(' + tId + ')');
+        hdr.innerHTML = '<span style="font-weight:700;font-family:Syne,sans-serif;">'
+          + '<i class="ti ti-building-skyscraper" style="color:var(--a);"></i> ' + (t.nombre || 'Torre ' + tId) + '</span>'
+          + '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:.78rem;color:var(--ink2);">'
+          + (t.bloques || '—') + ' bloques</span><i class="ti ti-chevron-down" id="tc-' + tId + '"></i></div>';
+        var body = document.createElement('div');
+        body.className = 'tower-body open';
+        body.id = 'tb-' + tId;
+        body.style.padding = '13px';
+        // Add tipologias table for this tower
+        var tiposHtml = '';
+        if (d.tipologias && d.tipologias.length) {
+          tiposHtml = '<div class="tw"><table class="dt"><thead><tr>'
+            + '<th>Tipología</th><th>Alcobas</th><th>Baños</th><th>Área</th><th>Precio</th><th></th>'
+            + '</tr></thead><tbody id="tipos-t' + tId + '">';
+          d.tipologias.forEach(function(tip) {
+            tiposHtml += '<tr>'
+              + '<td><input value="' + (tip.nombre||'') + '" style="width:100px;"></td>'
+              + '<td><input type="number" value="' + (tip.alcobas||'') + '" style="width:55px;"></td>'
+              + '<td><input type="number" value="' + (tip.banos||'') + '" style="width:55px;"></td>'
+              + '<td><input value="' + (tip.area_construida||'') + '" style="width:70px;"></td>'
+              + '<td><input value="' + (tip.precio||'') + '" style="width:70px;"></td>'
+              + '<td><button class="ab dl" onclick="this.parentElement.parentElement.remove()">×</button></td>'
+              + '</tr>';
+          });
+          tiposHtml += '</tbody></table></div>';
+          tiposHtml += '<button class="ab sp" style="margin-top:7px;" onclick="addTipoRow(this)" data-tid="tipos-t' + tId + '">+ Agregar tipología</button>';
+        }
+        body.innerHTML = '<div class="g3" style="margin-bottom:12px;">'
+          + '<div class="fg"><label class="fg-l">Nombre</label><input value="' + (t.nombre||'Torre '+tId) + '"></div>'
+          + '<div class="fg"><label class="fg-l">Bloques</label><input type="number" value="' + (t.bloques||5) + '"></div>'
+          + '<div class="fg"><label class="fg-l">Unid./bloque</label><input type="number" value="' + (t.unidades_bloque||4) + '"></div>'
+          + '</div>' + tiposHtml;
+        sec.appendChild(hdr);
+        sec.appendChild(body);
+        container.appendChild(sec);
+      });
+    }
+  }
+
+  // ── Populate precios table ──
+  if (d.tipologias && d.tipologias.length) {
+    var preciosBody = document.querySelector('#pe-tipos .dt tbody');
+    if (preciosBody) {
+      preciosBody.innerHTML = d.tipologias.map(function(t) {
+        return '<tr><td>' + (t.nombre||'—') + '</td>'
+          + '<td>' + (t.alcobas||'—') + ' alc · ' + (t.banos||'—') + ' baños' + (t.estudio?' + estudio':'') + '</td>'
+          + '<td>' + (t.area_construida||'—') + ' / ' + (t.area_privada||'—') + ' priv.</td>'
+          + '<td>' + (t.precio||'—') + '</td><td>—</td>'
+          + '<td><button class="ab ed" onclick="omInvForm()">Editar</button></td></tr>';
+      }).join('');
+    }
+  }
+
+  // ── Update project detail page ──
+  if (d.eslogan) {
+    var esloganEl = document.querySelector('.pd-badge');
+    if (esloganEl) esloganEl.textContent = d.eslogan;
+  }
+  if (d.nombre) {
+    var pdName = document.querySelector('.pd-name');
+    if (pdName) pdName.textContent = d.nombre.toUpperCase();
+  }
+
+  // ── Update dashboard stats from CRM ──
+  updateDashboardStats();
+
   // ── Show results with detailed checklist ──
   szUpdateProgress(100, 'Análisis completo · datos distribuidos en todos los módulos');
   var resEl = document.getElementById('szRes');
@@ -3189,35 +3284,53 @@ function metaLoadInsights() {
 }
 
 // ── RENDER CAMPAIGNS IN DASHBOARD ────────────────────
-var META_DEMO_CAMPAIGNS = [
-  { name: '61-SALVADOR-FORMULARIO-INTERNACIONAL', status: 'ACTIVE', reach: 31700, impressions: 118000, clicks: 2368, spend: 787000, cpc: 332, leads: 46, cpr: 17109 },
-  { name: 'JUNIO · TORRE 1 CARTAGENA',            status: 'ACTIVE', reach: 12400, impressions: 48000,  clicks: 920,  spend: 265000, cpc: 288, leads: 68, cpr: 3897  },
-  { name: 'EDGE SOSTENIBLE · JANEIRO',             status: 'PAUSED', reach: 5100,  impressions: 19000,  clicks: 380,  spend: 140000, cpc: 368, leads: 29, cpr: 4828  },
-  { name: 'INVERSIÓN · CARIOCA CONDOMINIO',        status: 'ACTIVE', reach: 8200,  impressions: 31000,  clicks: 610,  spend: 229000, cpc: 375, leads: 44, cpr: 5205  },
-  { name: 'CARTAGENA PATRIMONIO MUNDIAL',          status: 'ACTIVE', reach: 3800,  impressions: 14000,  clicks: 290,  spend: 98000,  cpc: 338, leads: 21, cpr: 4667  },
-];
+var META_DEMO_CAMPAIGNS = [];
 
 function metaRenderCampaigns(apiData, useDemo) {
-  var campaigns = useDemo ? META_DEMO_CAMPAIGNS : (apiData || META_DEMO_CAMPAIGNS).map(function(c) {
+  // If useDemo or no real data — show empty state, never show fake data
+  if (useDemo || !apiData || !apiData.length) {
+    metaShowEmptyState();
+    return;
+  }
+  // Map real API data
+  var campaigns = apiData.map(function(c) {
     var ins = (c.insights && c.insights.data && c.insights.data[0]) || {};
     return {
-      name:         c.name,
-      status:       c.status,
-      reach:        parseInt(ins.reach || 0),
-      impressions:  parseInt(ins.impressions || 0),
-      clicks:       parseInt(ins.clicks || 0),
-      spend:        Math.round(parseFloat(ins.spend || 0) * 4400), // USD to COP approx
-      cpc:          Math.round(parseFloat(ins.cpc || 0) * 4400),
-      leads:        (ins.actions || []).filter(function(a){ return a.action_type === 'lead'; }).reduce(function(s,a){ return s+parseInt(a.value); }, 0),
+      name:        c.name,
+      status:      c.status,
+      reach:       parseInt(ins.reach || 0),
+      impressions: parseInt(ins.impressions || 0),
+      clicks:      parseInt(ins.clicks || 0),
+      spend:       Math.round(parseFloat(ins.spend || 0) * 4400),
+      cpc:         Math.round(parseFloat(ins.cpc || 0) * 4400),
+      leads:       (ins.actions || []).filter(function(a){ return a.action_type === 'lead'; })
+                     .reduce(function(s,a){ return s + parseInt(a.value); }, 0),
     };
   });
-
-  // Update dashboard marketing table
   metaUpdateDashboardTable(campaigns);
-  // Update KPI strip
   metaUpdateKpiStrip(campaigns);
-  // Update social settings status
-  metaUpdateSocialStatus(useDemo);
+  // Update connect status
+  var statusEl = document.getElementById('meta-connect-status');
+  if (statusEl) { statusEl.textContent = '● En tiempo real · ' + campaigns.length + ' campañas'; statusEl.style.color = 'var(--green)'; }
+  ['fb-stat','meta-stat'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el && el.textContent.indexOf('Conectado') < 0) {
+      el.textContent = '● Conectado · Meta Ads activo';
+      el.style.color = 'var(--green)';
+    }
+  });
+}
+
+function metaShowEmptyState() {
+  var empty = document.getElementById('dash-campaigns-empty');
+  var table = document.getElementById('dash-campaigns-table');
+  if (empty) empty.style.display = 'block';
+  if (table) table.style.display = 'none';
+  // Clear KPIs
+  ['kpi-reach','kpi-impr','kpi-cpr','kpi-spend'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
 }
 
 function fmt(n) {
@@ -3228,22 +3341,22 @@ function fmt(n) {
 function fmtCOP(n) { return '$' + Math.round(n/1000) + 'K'; }
 
 function metaUpdateDashboardTable(campaigns) {
-  // Find the camp-row items on the dashboard
-  var container = document.querySelector('#vw-desk .mp:nth-child(2)');
-  if (!container) return;
-  var header = container.querySelector('.camp-row.hdr');
-  // Remove old rows (keep header)
-  container.querySelectorAll('.camp-row:not(.hdr)').forEach(function(r){ r.remove(); });
-
-  var maxReach = Math.max.apply(null, campaigns.map(function(c){ return c.reach; }));
+  var empty = document.getElementById('dash-campaigns-empty');
+  var tableWrap = document.getElementById('dash-campaigns-table');
+  if (!tableWrap) return;
+  if (empty) empty.style.display = 'none';
+  tableWrap.style.display = 'block';
+  // Remove old rows except header
+  tableWrap.querySelectorAll('.camp-row:not(.hdr)').forEach(function(r){ r.remove(); });
+  var maxReach = campaigns.length ? Math.max.apply(null, campaigns.map(function(c){ return c.reach || 0; })) : 1;
   campaigns.slice(0,5).forEach(function(c) {
-    var pct = maxReach > 0 ? Math.round(c.reach / maxReach * 100) : 0;
+    var pct = maxReach > 0 ? Math.round((c.reach || 0) / maxReach * 100) : 0;
     var statusColor = c.status === 'ACTIVE' ? '#059669' : '#D97706';
-    var statusDot = '<span style="width:7px;height:7px;border-radius:50%;background:' + statusColor + ';display:inline-block;margin-right:4px;"></span>';
+    var dot = '<span style="width:7px;height:7px;border-radius:50%;background:' + statusColor + ';display:inline-block;margin-right:4px;"></span>';
     var row = document.createElement('div');
     row.className = 'camp-row';
     row.innerHTML = '<div>'
-      + '<div class="camp-name">' + statusDot + c.name.substring(0,28) + (c.name.length > 28 ? '…' : '') + '</div>'
+      + '<div class="camp-name">' + dot + c.name.substring(0,26) + (c.name.length > 26 ? '…' : '') + '</div>'
       + '<div class="camp-bar"><div class="camp-bar-fill" style="width:' + pct + '%"></div></div>'
       + '</div>'
       + '<span>' + fmt(c.reach) + '</span>'
@@ -3251,27 +3364,29 @@ function metaUpdateDashboardTable(campaigns) {
       + '<span>' + (c.leads || '—') + '</span>'
       + '<span>' + fmtCOP(c.spend) + '</span>'
       + '<span><span class="pill p-d">' + fmtCOP(c.cpc) + '</span></span>';
-    container.appendChild(row);
+    tableWrap.appendChild(row);
   });
 }
 
 function metaUpdateKpiStrip(campaigns) {
-  var totalReach  = campaigns.reduce(function(s,c){ return s+c.reach; }, 0);
-  var totalSpend  = campaigns.reduce(function(s,c){ return s+c.spend; }, 0);
+  var totalReach  = campaigns.reduce(function(s,c){ return s+(c.reach||0); }, 0);
+  var totalSpend  = campaigns.reduce(function(s,c){ return s+(c.spend||0); }, 0);
   var totalLeads  = campaigns.reduce(function(s,c){ return s+(c.leads||0); }, 0);
-  var totalClicks = campaigns.reduce(function(s,c){ return s+c.clicks; }, 0);
-  var kpiEls = document.querySelectorAll('#vw-desk .mkt-v');
-  var vals = [fmt(totalReach), fmt(totalReach * 3.7), fmtCOP(totalSpend > 0 ? Math.round(totalSpend/totalLeads) : 4400), fmtCOP(totalSpend)];
-  kpiEls.forEach(function(el, i) { if (vals[i]) el.textContent = vals[i]; });
+  var totalClicks = campaigns.reduce(function(s,c){ return s+(c.clicks||0); }, 0);
+  var totalImpr   = campaigns.reduce(function(s,c){ return s+(c.impressions||0); }, 0);
+  var avgCpr      = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
+  var ids = { 'kpi-reach': fmt(totalReach), 'kpi-impr': fmt(totalImpr), 'kpi-cpr': avgCpr > 0 ? fmtCOP(avgCpr) : '—', 'kpi-spend': fmtCOP(totalSpend) };
+  Object.keys(ids).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = ids[id];
+  });
+  // Update dashboard stat for campaigns
+  var campEl = document.getElementById('dash-camps');
+  if (campEl) campEl.textContent = campaigns.filter(function(c){ return c.status === 'ACTIVE'; }).length;
 }
 
-function metaUpdateSocialStatus(isDemo) {
-  var statEl = document.getElementById('fb-stat');
-  if (statEl) {
-    statEl.textContent = isDemo ? '● Conectado · datos demo (añade App ID para tiempo real)' : '● Conectado · Meta Ads activo · datos en tiempo real';
-    statEl.style.color = isDemo ? 'var(--amber)' : 'var(--green)';
-  }
-}
+// metaUpdateSocialStatus removed — handled in metaRenderCampaigns
+
 
 function metaUpdateDashboardBadge(active) {
   var badge = document.createElement('div');
@@ -3513,6 +3628,58 @@ function metaShowTokenGuide() {
 })();
 
 
+
+// ── DASHBOARD STATS — always reflect real data ──────────
+function updateDashboardStats() {
+  // Leads from CRM
+  var leadsCount = typeof crmLeads !== 'undefined' ? crmLeads.length : 0;
+  var el = document.getElementById('dash-leads');
+  if (el) el.textContent = leadsCount > 0 ? leadsCount : '—';
+
+  // Quality breakdown
+  if (typeof crmLeads !== 'undefined' && crmLeads.length > 0) {
+    var hot = crmLeads.filter(function(l){ return l.stars >= 4; }).length;
+    var mid = crmLeads.filter(function(l){ return l.stars === 3; }).length;
+    var low = crmLeads.filter(function(l){ return l.stars <= 2; }).length;
+    var hotEl = document.getElementById('kpi-hot'); if(hotEl) hotEl.textContent = hot + ' leads';
+    var midEl = document.getElementById('kpi-mid'); if(midEl) midEl.textContent = mid + ' leads';
+    var lowEl = document.getElementById('kpi-low'); if(lowEl) lowEl.textContent = low + ' leads';
+
+    // Show last 3 leads in dashboard preview
+    var preview = document.getElementById('dash-leads-preview');
+    if (preview) {
+      var recent = crmLeads.slice(0, 3);
+      var rows = recent.map(function(l) {
+        var stars = '★'.repeat(l.stars) + '☆'.repeat(5-l.stars);
+        return '<div class="cp-row" style="cursor:pointer;" onclick="navCRM()">'
+          + '<span style="display:flex;align-items:center;gap:8px;">'
+          + '<span style="width:30px;height:30px;border-radius:50%;background:' + avColor(l.nombre) + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:.72rem;font-weight:700;flex-shrink:0;">' + avIni(l.nombre) + '</span>'
+          + '<span><div style="font-size:.85rem;font-weight:600;">' + l.nombre + '</div>'
+          + '<div style="font-size:.71rem;color:var(--ink3);">' + (l.campana||'—') + '</div></span>'
+          + '</span>'
+          + '<span style="font-size:.79rem;color:#F59E0B;">' + stars + '</span>'
+          + '</div>';
+      }).join('');
+      preview.innerHTML = rows + '<div style="text-align:center;margin-top:8px;"><button class="ab sp" onclick="navCRM()" style="font-size:.75rem;">Ver todos en CRM →</button></div>';
+    }
+  }
+
+  // Inventario count
+  var invRows = document.querySelectorAll('#invtbl tr[data-s]');
+  var dispEl = document.getElementById('dash-disp');
+  if (dispEl) dispEl.textContent = invRows.length > 0 ? invRows.length : '—';
+
+  // Cotizaciones count
+  var cotRows = document.querySelectorAll('#cotTbl tr[data-cot]');
+  var cotEl = document.getElementById('dash-cots');
+  if (cotEl) cotEl.textContent = cotRows.length > 0 ? cotRows.length : '—';
+}
+
+function omInvForm(){om('inv-form');}
+function navCRM(){nav('crm');}
+function navSim(){nav('sim');}
+function navCfg(){nav('cfg');}
+function navUrb(){nav('urb');}
 // ── INIT ──
 buildAvGrid();buildPie();buildTimeBars();setU('y');chkR();cs();
 // Check session on load
