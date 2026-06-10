@@ -1,0 +1,8 @@
+name = "archibot-webhook"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "archibot-janeiro"
+FIREBASE_API_KEY = "AIzaSyABWcCprZq1071FVPXjpYlaw1IzO3O_bUY"
+META_VERIFY_TOKEN = "archibot_janeiro_2026"
