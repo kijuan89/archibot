@@ -1607,10 +1607,7 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
                     <i class="ti ti-plug-connected"></i> Conectar
                   </button>
                 </div>
-                <div style="background:rgba(245,158,11,.1);border-radius:9px;padding:9px 12px;font-size:.78rem;color:#92400E;margin-bottom:7px;line-height:1.6;">
-                  <strong>Paso requerido para datos en tiempo real:</strong><br>
-                  En <a href="https://developers.facebook.com/apps" target="_blank" style="color:#1877F2;font-weight:700;">Meta Developers → tu app → Configuración básica</a> agrega <strong>kijuan89.github.io</strong> en <em>Dominios de la app</em>. Sin esto Meta bloquea las llamadas desde tu sitio.
-                </div>
+
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                   <a href="https://developers.facebook.com/tools/explorer/" target="_blank"
                     style="padding:7px 12px;border-radius:9px;background:#1877F2;color:#fff;text-decoration:none;font-size:.78rem;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
@@ -1818,7 +1815,17 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
 const ALL_VIEWS=['desk','proj-detail','inv','urb','edit','sim','cot','crm','ci','obra','ai','cfg'];
 function nav(id,el){
   if(id==='crm'){setTimeout(initCRM,50);}
-  if(id==='desk'){setTimeout(updateDashboardStats,100);}
+  if(id==='desk'){
+    setTimeout(updateDashboardStats,100);
+    setTimeout(function(){
+      if (META_CONFIG.lastCampaigns && META_CONFIG.lastCampaigns.length) {
+        metaRenderDashboard(META_CONFIG.lastCampaigns);
+        metaUpdateConnectStatus(META_CONFIG.lastCampaigns.length);
+      } else if (META_CONFIG.accessToken) {
+        metaFetchCampaigns(META_CONFIG.accessToken, META_CONFIG.adAccountId);
+      }
+    }, 150);
+  }
   if(id==='urb'){setTimeout(urbLoadStoredFiles,100);}
   ALL_VIEWS.forEach(v=>{const p=document.getElementById('vw-'+v);if(p)p.classList.toggle('on',v===id);});
   document.querySelectorAll('.mn').forEach(b=>b.classList.remove('on'));
@@ -3255,11 +3262,12 @@ var META_CONFIG = {
 // ═══════════════════════════════════════════════════════════════════
 
 var META_CONFIG = {
-  accessToken: '',
-  adAccountId: 'act_377276466367241',  // CARTAGENA — cuenta publicitaria Ingenal
-  accountName: 'CARTAGENA',
-  userName:    '',
-  connected:   false,
+  accessToken:     '',
+  adAccountId:     'act_377276466367241',
+  accountName:     'CARTAGENA · Ingenal',
+  userName:        '',
+  connected:       false,
+  lastCampaigns:   null,
 };
 
 // ── ENTRY POINT ──────────────────────────────────────────────────
@@ -3435,9 +3443,16 @@ function metaFetchCampaigns(token, accountId) {
       });
 
       try { localStorage.setItem('ab_meta_campaigns', JSON.stringify(campaigns)); } catch(e) {}
-      metaRenderDashboard(campaigns);
+      // Store in memory for immediate access
+      META_CONFIG.lastCampaigns = campaigns;
+      // Render if dashboard is visible, otherwise it will render on nav
+      var dashVisible = document.getElementById('vw-desk') &&
+                        document.getElementById('vw-desk').style.display !== 'none';
+      if (dashVisible) {
+        metaRenderDashboard(campaigns);
+      }
       metaUpdateConnectStatus(campaigns.length);
-      toast('✓ Meta Ads actualizado · ' + campaigns.length + ' campañas');
+      toast('✓ Meta Ads · ' + campaigns.length + ' campañas cargadas');
     })
     .catch(function(err) {
       console.error('[Meta] network:', err);
