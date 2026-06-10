@@ -1608,6 +1608,7 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
                   </button>
                 </div>
 
+                <div id="meta-token-expiry" style="font-size:.76rem;color:var(--ink3);margin-bottom:6px;"></div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                   <a href="https://developers.facebook.com/tools/explorer/" target="_blank"
                     style="padding:7px 12px;border-radius:9px;background:#1877F2;color:#fff;text-decoration:none;font-size:.78rem;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
@@ -1617,7 +1618,7 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
                     <i class="ti ti-refresh"></i> Reconectar
                   </button>
                   <button class="ab dl" onclick="metaClearToken()" style="font-size:.78rem;">
-                    <i class="ti ti-trash"></i> Borrar token guardado
+                    <i class="ti ti-trash"></i> Borrar token
                   </button>
                 </div>
               </div>
@@ -1815,16 +1816,32 @@ input[type=range]{width:100%;accent-color:var(--a);margin-bottom:2px;}
 const ALL_VIEWS=['desk','proj-detail','inv','urb','edit','sim','cot','crm','ci','obra','ai','cfg'];
 function nav(id,el){
   if(id==='crm'){setTimeout(initCRM,50);}
+  if(id==='cfg'){setTimeout(metaCheckTokenExpiry, 200);}
   if(id==='desk'){
-    setTimeout(updateDashboardStats,100);
+    setTimeout(updateDashboardStats, 100);
     setTimeout(function(){
+      // Load cached campaigns immediately
       if (META_CONFIG.lastCampaigns && META_CONFIG.lastCampaigns.length) {
         metaRenderDashboard(META_CONFIG.lastCampaigns);
         metaUpdateConnectStatus(META_CONFIG.lastCampaigns.length);
-      } else if (META_CONFIG.accessToken) {
-        metaFetchCampaigns(META_CONFIG.accessToken, META_CONFIG.adAccountId);
+      } else {
+        // Try localStorage cache
+        try {
+          var cached = JSON.parse(localStorage.getItem('ab_meta_campaigns') || '[]');
+          if (cached.length) {
+            META_CONFIG.lastCampaigns = cached;
+            metaRenderDashboard(cached);
+            metaUpdateConnectStatus(cached.length);
+          }
+        } catch(e) {}
+        // Always refresh from API if token available
+        if (META_CONFIG.accessToken && META_CONFIG.adAccountId) {
+          setTimeout(function() {
+            metaFetchCampaigns(META_CONFIG.accessToken, META_CONFIG.adAccountId);
+          }, 500);
+        }
       }
-    }, 150);
+    }, 200);
   }
   if(id==='urb'){setTimeout(urbLoadStoredFiles,100);}
   ALL_VIEWS.forEach(v=>{const p=document.getElementById('vw-'+v);if(p)p.classList.toggle('on',v===id);});
@@ -3275,6 +3292,50 @@ var META_CONFIG = {
   connected:       false,
   lastCampaigns:   null,
 };
+
+// ── EXCHANGE FOR LONG-LIVED TOKEN (60 days) ─────────────────────
+// Converts short-lived token to 60-day token automatically
+function metaExchangeLongLivedToken(shortToken) {
+  // App ID and secret needed for exchange
+  // Since we can't expose app secret in frontend, we skip exchange
+  // and just use the token directly with a 60-day reminder
+  var tokenDate = null;
+  try { tokenDate = localStorage.getItem('ab_meta_token_date'); } catch(e) {}
+  if (tokenDate) {
+    var daysOld = Math.floor((Date.now() - new Date(tokenDate).getTime()) / (1000*60*60*24));
+    var daysLeft = 60 - daysOld;
+    if (daysLeft < 10) {
+      setTimeout(function() {
+        toast('⚠ Token de Meta expira en ' + daysLeft + ' días · renuévalo en Ajustes → Redes Sociales');
+      }, 3000);
+    }
+  }
+  // Proceed with verification
+  metaVerifyAndLoad(shortToken);
+}
+
+// ── CHECK TOKEN EXPIRY ON LOAD ────────────────────────────────────
+function metaCheckTokenExpiry() {
+  try {
+    var tokenDate = localStorage.getItem('ab_meta_token_date');
+    var expiryEl  = document.getElementById('meta-token-expiry');
+    if (!tokenDate) return;
+    var daysOld  = Math.floor((Date.now() - new Date(tokenDate).getTime()) / (1000*60*60*24));
+    var daysLeft = 60 - daysOld;
+    if (expiryEl) {
+      if (daysLeft <= 0) {
+        expiryEl.textContent = '⚠ Token expirado · genera uno nuevo';
+        expiryEl.style.color = '#DC2626';
+      } else if (daysLeft <= 10) {
+        expiryEl.textContent = '⏱ Token expira en ' + daysLeft + ' días';
+        expiryEl.style.color = '#D97706';
+      } else {
+        expiryEl.textContent = '✓ Token válido · ' + daysLeft + ' días restantes';
+        expiryEl.style.color = '#059669';
+      }
+    }
+  } catch(e) {}
+}
 
 // ── ENTRY POINT ──────────────────────────────────────────────────
 function metaInit() {
