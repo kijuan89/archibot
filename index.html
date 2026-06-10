@@ -2827,14 +2827,20 @@ function loadAllPersistedData() {
     if (data) applyProjectData(data);
   });
 
-  // 3. Load CRM leads
+  // 3. Load CRM leads from Firestore (includes webhook leads from Meta)
   fbGetDoc('crm', 'janeiro_leads').then(function(data) {
     if (data && data.leads && data.leads.length > 0) {
-      crmLeads = data.leads;
+      // Merge stored leads with any new webhook leads
+      var storedIds = crmLeads.map(function(l){ return l.id; });
+      data.leads.forEach(function(l) {
+        if (storedIds.indexOf(l.id) < 0) crmLeads.push(l);
+      });
       if (typeof renderCrmList === 'function') renderCrmList();
       if (typeof renderCrmKpis === 'function') renderCrmKpis();
     }
   });
+  // Also load real-time webhook leads from crm_leads collection
+  loadWebhookLeads();
 }
 
 function applyStateToUI(state) {
@@ -3787,6 +3793,45 @@ function navCRM(){nav('crm');}
 function navSim(){nav('sim');}
 function navCfg(){nav('cfg');}
 function navUrb(){nav('urb');}
+
+// ── WEBHOOK LEADS — load from Firestore crm_leads collection ─────
+// These come from the Cloudflare Worker (Meta forms + WhatsApp)
+function loadWebhookLeads() {
+  if (!fbDB) return;
+  try {
+    fbDB.collection('crm_leads')
+      .orderBy('fecha', 'desc')
+      .limit(200)
+      .get()
+      .then(function(snapshot) {
+        if (snapshot.empty) return;
+        var newLeads = 0;
+        var existingIds = crmLeads.map(function(l){ return l.id; });
+        snapshot.forEach(function(doc) {
+          var lead = doc.data();
+          lead.id = doc.id;
+          if (existingIds.indexOf(lead.id) < 0) {
+            crmLeads.push(lead);
+            newLeads++;
+          }
+        });
+        if (newLeads > 0) {
+          console.log('[ArchiBot] ' + newLeads + ' leads nuevos desde webhook');
+          if (typeof renderCrmList === 'function') renderCrmList();
+          if (typeof renderCrmKpis === 'function') renderCrmKpis();
+          updateDashboardStats();
+          if (newLeads > 0) toast('🔔 ' + newLeads + ' lead(s) nuevo(s) desde Meta');
+        }
+      })
+      .catch(function(e) { console.warn('loadWebhookLeads:', e); });
+  } catch(e) { console.warn('loadWebhookLeads error:', e); }
+}
+
+// Poll for new webhook leads every 60 seconds
+setInterval(function() {
+  if (currentUser) loadWebhookLeads();
+}, 60000);
+
 // ── INIT ──
 buildAvGrid();buildPie();buildTimeBars();setU('y');chkR();cs();
 // Check session on load
