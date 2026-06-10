@@ -2015,6 +2015,10 @@ function sbLoadDemo(){
   var planDiv=document.getElementById('sbPlanImg');
   planDiv.style.backgroundImage='none';
   planDiv.innerHTML=buildDemoSvg();
+  planDiv.style.pointerEvents='none';
+  planDiv.style.zIndex='0';
+  var svgEl=document.getElementById('sbSvg');
+  if(svgEl){svgEl.style.zIndex='10';svgEl.style.pointerEvents='all';}
   sbShowBoard();
   toast('Plano demo de Janeiro cargado · '+sbUnits.length+' unidades · haz clic para ver detalles');
 }
@@ -4273,9 +4277,15 @@ function sbLoadUserPlan(inp) {
     var planDiv = document.getElementById('sbPlanImg');
     if (planDiv) {
       planDiv.style.backgroundImage = 'url(' + result.url + ')';
-      planDiv.style.backgroundSize = 'cover';
+      planDiv.style.backgroundSize = 'contain';
       planDiv.style.backgroundPosition = 'center';
+      planDiv.style.backgroundRepeat = 'no-repeat';
+      planDiv.style.pointerEvents = 'none'; // SVG handles all clicks
+      planDiv.style.zIndex = '0';
       planDiv.innerHTML = '';
+      // Ensure SVG stays on top
+      var svgEl = document.getElementById('sbSvg');
+      if (svgEl) { svgEl.style.zIndex = '10'; svgEl.style.pointerEvents = 'all'; }
     }
     sbHasPlan = true;
     sbShowBoard();
